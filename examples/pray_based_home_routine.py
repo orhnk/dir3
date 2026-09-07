@@ -7,7 +7,7 @@ Anker bauen. Alles wird pro Tag lazy aufgelöst.
 from datetime import time, timedelta
 
 from dir3 import day as _day
-from dir3 import next_day_start, task
+from dir3 import next_day_start, task, week
 
 
 @_day(name="Gebets-Tag")
@@ -28,3 +28,8 @@ def day(ctx):
         task("Isha", start=p.isha - timedelta(minutes=10), until=p.isha + timedelta(minutes=30)),
         task("Sleep", until=next_day_start),
     ]
+
+
+def make_plan():
+    """Rufe es direkt auf: `dir3 examples/pray_based_home_routine.py --until 1`."""
+    return week(mon=day, tue=day, wed=day, thu=day, fri=day, sat=day, sun=day)
