@@ -23,7 +23,7 @@ from .anchor import (
     next_event,
     register,
 )
-from .config import ConfigManager, Dir3Config
+from .config import Dir3Config, LocationSettings, PrayerSettings
 from .context import DayContext, PrayerGate, SunGate
 from .core import (
     CalendarPattern,
@@ -123,8 +123,9 @@ __all__ = [
     "PlanDay",
     "PlannedEvent",
     "Services",
-    "ConfigManager",
     "Dir3Config",
+    "LocationSettings",
+    "PrayerSettings",
     "rains",
     "anchor",
     "register",

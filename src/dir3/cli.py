@@ -1,8 +1,8 @@
 """Command line: ``dir3 <planfile> [--until N] [--from DATE]``.
 
-The planfile is a normal Python module.  If it defines a ``plan`` (Month/Week)
-or a callable ``make_plan()``, dir3 compiles and prints it.  A module may also
-call ``compile_pattern`` itself.
+The planfile is a plain Python module - the single source of everything: it
+defines the schedule (``day``/``week``/``month``), the optional location
+(``location = (lat, lon, tz)``) and optional prayer source (``prayer = "..."``).
 """
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import traceback
 from datetime import date, datetime
 from pathlib import Path
 
-from .config import ConfigManager
+from .config import Dir3Config
 from .core import Month, Week
 from .engine import compile_pattern
 from .render import render_plan
@@ -63,7 +63,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--from", dest="start", type=_parse_date, default=None, help="Startdatum YYYY-MM-DD"
     )
-    parser.add_argument("--config", type=Path, default=None, help="Pfad zur config.toml")
     parser.add_argument(
         "--offline", action="store_true", help="Gebetszeiten rein offline berechnen"
     )
@@ -73,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(f"Planfile existiert nicht: {args.planfile}")
 
     module = _load_module(args.planfile)
-    config = ConfigManager(args.config).load()
+    config = Dir3Config.from_planfile(module)
     if args.offline:
         config.prayer.provider = "offline"
     services = Services(config=config)

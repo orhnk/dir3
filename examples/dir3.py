@@ -1,7 +1,8 @@
 """Das zentrale und feste Planfile: kombiniert Wochen zu einem Monat.
 
-Lade es mit der CLI (statt `credentials` braucht es nichts mehr, die CLI
-und die config.toml kümmern sich um Wetter/Gebete/Standort):
+Der Standort bestimmt sich automatisch per Geolocation (oder via
+``location = (lat, lon, "zone")`` im Planfile), Gebete kommen aus Aladhan
+mit Offline-Fallback - keine Konfig-Datei nötig:
 
     dir3 examples/dir3.py --until 360
 """

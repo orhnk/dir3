@@ -27,13 +27,20 @@ nix develop                       # dev shell with all deps + PYTHONPATH=src
 nix build                         # installs the `dir3` binary + runs the tests
 ```
 
-An auto-created config lives at `~/.config/dir3/config.toml`
-(auto-detected city via ipapi.co). Prayer sources, in `[prayer]`:
+**Kein Config-File** — alles lebt im Python-Planfile. Der Standort bestimmt
+sich automatisch per Geolocation (ipapi.co); optional überschreibst du ihn im
+Planfile, und zwar nur so viel, wie nötig:
 
-- `provider = "auto"` (default) — Aladhan first, offline calculator as fallback;
-- `provider = "ezanvakti"` / `"diyanet"` — official Turkish Diyanet per-district
-  times (district resolved from the location; one request per horizon);
-- `provider = "offline"` — never touch the network.
+```python
+location = (40.7992, 29.4305, "Europe/Istanbul")    # lat, lon, IANA-Zeitzone
+prayer   = "ezanvakti"     # "auto" | "aladhan" | "ezanvakti"/"diyanet" | "offline"
+```
+
+- Standort nicht gesetzt → selbst bestimmt (funktioniert überall);
+- `prayer = "auto"` (default) — Aladhan first, offline calculator as fallback;
+- `prayer = "ezanvakti"` / `"diyanet"` — offizielle türkische Diyanet-Zeiten pro
+  Bezirk (Bezirk aus dem Standort aufgelöst; eine Anfrage pro Horizont);
+- `prayer = "offline"` — niemals Netzwerk; `--offline` auf der CLI ist das Kürzel.
 
 ## The idea
 
@@ -67,6 +74,14 @@ __title__ = "My week"
 ```
 
 ## DSL
+
+**Planfile-Konfiguration** (optional, als Modul-Attribute — sonst per Autodetect):
+
+```python
+location = (40.7992, 29.4305, "Europe/Istanbul")  # hier, im Planfile - keine TOML
+prayer   = "ezanvakti"                             # Gebetsquelle des Planfiles
+provider = "ezanvakti"                             # Kurzform für `prayer`
+```
 
 ### Task
 
@@ -179,7 +194,7 @@ dir3 examples/lebensjahr.py --until 365
 ## Development
 
 ```bash
-PYTHONPATH=src /tmp/opencode/dir3venv/bin/python -m pytest tests/   # 48 tests
+PYTHONPATH=src /tmp/opencode/dir3venv/bin/python -m pytest tests/   # 55 tests
 ruff check src tests examples
 ```
 

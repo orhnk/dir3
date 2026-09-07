@@ -1,8 +1,9 @@
 """Fastentag: Der Tag endet nie an der Uhr, sondern an der Sonne.
 
 Alle Bausteine sind eigene Anker, die aus den Gebetszeiten abgeleitet werden.
-Aendere die Stadt (config.toml) - *der ganze Tag verschiebt sich* mit dem
-Sonnenlauf. Die Mahlzeiten richten sich nach den echten Gebetszeiten:
+Aendere den Standort (per ``location = (...)`` im Planfile oder automatisch
+per Geolocation) - *der ganze Tag verschiebt sich* mit dem Sonnenlauf. Die
+Mahlzeiten richten sich nach den echten Gebetszeiten:
 
     Qiyam  ... freiwilliges Nachtgebet vor dem Morgengrauen
     imsak  ... letzte Gelegenheit zu essen (20 min vor Fajr)

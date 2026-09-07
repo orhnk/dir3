@@ -1,12 +1,12 @@
 """Geolocation: where are we, and in which timezone.
 
 Resolution order:
-1. explicit latitude/longitude/timezone from ``config.toml``;
-2. auto-detection via ``ipapi.co`` when ``use_geolocation`` is enabled;
-3. fallback to a documented default (Berlin) using the system timezone.
+1. explicit latitude/longitude/timezone from the **planfile** (``location = (...)``);
+2. auto-detection via ``ipapi.co`` when ``use_geolocation`` is enabled (default);
+3. a clear error, never a silently guessed city.
 
-The resolved location is printed by the CLI, so a fallback is never silently
-mistaken for your real city.
+The resolved location is printed by the CLI, so a guess is never mistaken for
+your real city.
 """
 from __future__ import annotations
 
@@ -20,13 +20,10 @@ import requests
 from ..config import Dir3Config, LocationSettings
 
 IPAPI_URL = "https://ipapi.co/json/"
+#: ipapi.co rejects empty/native clients with HTTP 429 - a UA makes it work everywhere.
+IPAPI_USER_AGENT = "dir3/0.1 (soft-planning-cli)"
 
 _FIXED_OFFSET = re.compile(r"^(?P<sign>[+-])(?P<h>\d{1,2})(?::?(?P<m>\d{2}))?$")
-
-#: Coordinates + timezone used when neither config nor IP detection provide a location.
-DEFAULT_LATITUDE = 52.52
-DEFAULT_LONGITUDE = 13.405
-DEFAULT_TIMEZONE = "Europe/Berlin"
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,7 +54,7 @@ class GeoLocator:
 
     def _resolve(self) -> GeoLocation:
         loc = self.config.location
-        if self._has_coordinates(loc):
+        if loc.latitude is not None and loc.longitude is not None:
             return self._from_manual(loc)
 
         if loc.use_geolocation:
@@ -67,25 +64,11 @@ class GeoLocator:
                 if merged is not None:
                     return merged
 
-        tz_name = loc.timezone
-        latitude = loc.latitude if loc.latitude is not None else DEFAULT_LATITUDE
-        longitude = loc.longitude if loc.longitude is not None else DEFAULT_LONGITUDE
-        if tz_name is None:
-            if loc.latitude is None or loc.longitude is None:
-                tz_name = DEFAULT_TIMEZONE  # the default location we are about to use
-            else:
-                tz_name = _system_tz()  # real coords but no zone: guess the machine zone
-        return GeoLocation(
-            latitude=latitude,
-            longitude=longitude,
-            timezone=tz_name,
-            city=loc.city,
-            country=loc.country,
+        raise RuntimeError(
+            "Standort nicht bestimmbar. Bitte im Planfile Koordinaten setzen, "
+            'z. B. location = (48.1374, 11.5754, "Europe/Berlin"), '
+            "oder die Geolocation (ipapi.co) erreichbar machen."
         )
-
-    @staticmethod
-    def _has_coordinates(loc: LocationSettings) -> bool:
-        return loc.latitude is not None and loc.longitude is not None and bool(loc.timezone)
 
     @staticmethod
     def _from_manual(loc: LocationSettings) -> GeoLocation:
@@ -99,7 +82,11 @@ class GeoLocator:
 
     def _from_ip(self) -> GeoLocation | None:
         try:
-            response = requests.get(IPAPI_URL, timeout=self._timeout)
+            response = requests.get(
+                IPAPI_URL,
+                timeout=self._timeout,
+                headers={"User-Agent": IPAPI_USER_AGENT},
+            )
             response.raise_for_status()
             payload = response.json()
         except requests.RequestException:  # pragma: no cover - network
