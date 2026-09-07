@@ -14,6 +14,10 @@ from datetime import time, timedelta
 from dir3 import anchor, day, prayer, subtract_time, task
 from dir3 import week as _week
 
+# --- Standort (dein Ort, hier im Planfile) ----------------------------------
+# lat, lon, IANA-Zeitzone. Ohne diese Zeile bestimmt dir3 ihn per Geolocation.
+location = (40.7992, 29.4305, "Europe/Istanbul")
+
 
 @anchor
 def qiyam(ctx):

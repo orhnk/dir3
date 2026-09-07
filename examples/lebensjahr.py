@@ -18,6 +18,10 @@ from datetime import date, time
 from dir3 import anchor, day, task
 from dir3 import calendar as _calendar
 
+# --- Standort (dein Ort, hier im Planfile) ----------------------------------
+# lat, lon, IANA-Zeitzone. Ohne diese Zeile bestimmt dir3 ihn per Geolocation.
+location = (40.7992, 29.4305, "Europe/Istanbul")
+
 # --- Kalender-Fakten (aus den deiner Welt) ----------------------------------
 FEIERTAGE = {
     date(2026, 12, 24): "Heiligabend",

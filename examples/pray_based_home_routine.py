@@ -9,6 +9,10 @@ from datetime import time, timedelta
 from dir3 import day as _day
 from dir3 import next_day_start, task, week
 
+# --- Standort (dein Ort, hier im Planfile) ----------------------------------
+# lat, lon, IANA-Zeitzone. Ohne diese Zeile bestimmt dir3 ihn per Geolocation.
+location = (40.7992, 29.4305, "Europe/Istanbul")
+
 
 @_day(name="Gebets-Tag")
 def day(ctx):

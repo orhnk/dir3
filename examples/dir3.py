@@ -11,6 +11,10 @@ import routine_week
 
 from dir3 import month
 
+# --- Standort (dein Ort, hier im Planfile) ----------------------------------
+# lat, lon, IANA-Zeitzone. Ohne diese Zeile bestimmt dir3 ihn per Geolocation.
+location = (40.7992, 29.4305, "Europe/Istanbul")
+
 # Monat: 3 Raster-Wochen nach routine_week, 1 Gebets-Woche nach pray_based_week.
 plan = month(
     routine_week.week,

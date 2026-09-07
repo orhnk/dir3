@@ -9,12 +9,17 @@ keine feste Zeit: Der Plan selbst sagt dir, wann morgen wieder Leben ist.
 
 Haengt das erste Event von morgen an einem Anker (z. B. ``prayer.fajr``),
 wird der Schlaf je nach Jahreszeit mit der Sonne kuerzer oder laenger -
-in Berlin im Juni bis 01:07, im Dezember bis 06:05.
+der eine Endpunkt ist nie die Uhr, sondern "das nächste Leben".
 """
+
 from datetime import time
 
 from dir3 import day, next_event, prayer, task
 from dir3 import week as _week
+
+# --- Standort (dein Ort, hier im Planfile) ----------------------------------
+# lat, lon, IANA-Zeitzone. Ohne diese Zeile bestimmt dir3 ihn per Geolocation.
+location = (40.7992, 29.4305, "Europe/Istanbul")
 
 
 @day(name="Mein Tag")
@@ -31,8 +36,13 @@ def alltag(ctx):
 
 def make_plan():
     return _week(
-        mon=alltag, tue=alltag, wed=alltag, thu=alltag, fri=alltag,
-        sat=alltag, sun=alltag,
+        mon=alltag,
+        tue=alltag,
+        wed=alltag,
+        thu=alltag,
+        fri=alltag,
+        sat=alltag,
+        sun=alltag,
     )
 
 
