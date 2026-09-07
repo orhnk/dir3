@@ -1,16 +1,25 @@
-import requests
-from dir3 import task, next_day_start
-from datetime import timedelta, time
+"""Ein Zuhause-Tag: weich, anker- und wetterbewusst.
 
-# by default all plans are lazy-loaded. That means, the weather will be calculated, in the Morning 00:00 at that day! If it is not declared different in the dir3.py config
+Alle Pläne werden lazy pro Tag ausgewertet - das Wetter und die Gebetszeiten
+werden erst am jeweiligen Tag angefragt, nicht beim Import.
+"""
+from datetime import time, timedelta
 
-get_up = time(5,0)
+from dir3 import day as _day
+from dir3 import next_day_start, rains, task
 
-day = [
-    task("Read", from=get_up, duration=timedelta(hours=3)), # First element must have a from parameter!
-    task("Eat Food", duration=timedelta(minutes=50)), # from parameter is not needed here, because we just want the event to come right after the one before. If we want a space in between, we can use the parameter `space=time(1,0)` or `from=get_up+time(1,0)`, if there is no event before, as it is conditioned, this will be the first event of the day!
-    task("Family Time", duration=timedelta(hours=2)),
-    task("Web", space=timedelta(hours=1), duration=timedelta(hours=2)), # if today is rainy, we're not going outside.
-    task("Eat Food", duration=timedelta(hours=1, minutes=30)),
-    task("Sleep", until=next_day_start())
-]
+
+@_day(name="Zu Hause")
+def day(ctx):
+    return [
+        # Das erste Element muss einen Start-Anker haben (hier eine feste Zeit).
+        task("Read", start=time(5, 0), duration=timedelta(hours=3)),
+        # Ohne `start` fließt der Task direkt nach dem vorherigen.
+        task("Eat Food", duration=timedelta(minutes=50)),
+        task("Family Time", duration=timedelta(hours=2)),
+        # `space` lässt eine Lücke; `unless=rains()` lässt den Task aus, wenn Regen droht.
+        task("Web", space=timedelta(hours=1), duration=timedelta(hours=2), unless=rains()),
+        task("Eat Food", duration=timedelta(hours=1, minutes=30)),
+        # `next_day_start` schiebt den Schlaf bis Mitternacht.
+        task("Sleep", until=next_day_start),
+    ]

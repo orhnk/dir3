@@ -1,13 +1,14 @@
-import requests
-from dir3 import week
+"""Eine ganze Woche: jeden Tag derselbe Gebets-Routine-Tag."""
 import pray_based_home_routine as pray_based
 
+from dir3 import week
+
 week = week(
-    pray_based.day,
-    pray_based.day,
-    pray_based.day,
-    pray_based.day,
-    pray_based.day,
-    pray_based.day,
-    pray_based.day
+    mon=pray_based.day,
+    tue=pray_based.day,
+    wed=pray_based.day,
+    thu=pray_based.day,
+    fri=pray_based.day,
+    sat=pray_based.day,
+    sun=pray_based.day,
 )

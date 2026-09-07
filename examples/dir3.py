@@ -1,25 +1,19 @@
-# Diese Datei ist das zentrale und feste "dir3.py". Sie enthält die letzendliche Logik, um dein Plan zu compilen.
+"""Das zentrale und feste Planfile: kombiniert Wochen zu einem Monat.
 
-# Das ist ein monatlicher Plan, es kann auch jährliche, wochentliche, tägliche und sogar leben-lange Planen geben.
+Lade es mit der CLI (statt `credentials` braucht es nichts mehr, die CLI
+und die config.toml kümmern sich um Wetter/Gebete/Standort):
 
-import dir3
+    dir3 examples/dir3.py --until 360
+"""
+import pray_based_week
+import routine_week
+
 from dir3 import month
-import routine_week, pray_based_week
-from datetime import timedelta
 
-cred = "Google-Calendar-API-1234567890123456789012345678901"
-
-
-dir3.compile(
-             month
-
-             (
-                   routine_week.week,
-                   routine_week.week,
-                   routine_week.week,
-                   pray_based_week.week
-             ),
-
-             until=timedelta(days=360),
-             credentials=cred
+# Monat: 3 Raster-Wochen nach routine_week, 1 Gebets-Woche nach pray_based_week.
+plan = month(
+    routine_week.week,
+    routine_week.week,
+    routine_week.week,
+    pray_based_week.week,
 )

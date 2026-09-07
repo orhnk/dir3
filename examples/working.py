@@ -1,15 +1,32 @@
-import requests
-from dir3 import task, next_day_start
-from datetime import timedelta, time
+"""Ein Arbeitstag: eigene Funktions-Anker für Arbeitsbeginn und -ende.
 
-get_up = time(5,0)
+Das ist die Kernidee von dir3: *jede eigene Funktion* darf ein Zeitanchor
+sein, indem du sie mit `@anchor` deklarierst.
+"""
+from datetime import time, timedelta
 
-day = [
-    task("Morning Routine", from=get_up, until=work_start_for_today()-timedelta(hours=1)), # First element must have a from parameter!
-    task("Go to Work", duration=timedelta(hours=1)),
-    task("Job", until=work_end_for_today()), # if today is rainy, we're not going outside.
-    task("Go to Home", duration=timedelta(hours=1)),
-    task("Family Time", duration=timedelta(hours=1, minutes=30)),
-    task("Eat Food", duration=timedelta(hours=1, minutes=30)),
-    task("Sleep", until=next_day_start())
-]
+from dir3 import anchor, next_day_start, task
+from dir3 import day as _day
+
+
+@anchor
+def work_start(ctx):
+    return time(8, 30)
+
+
+@anchor
+def work_end(ctx):
+    return time(17, 0)
+
+
+@_day(name="Arbeiten")
+def day(ctx):
+    return [
+        task("Morning Routine", start=time(5, 0), until=work_start - timedelta(hours=1)),
+        task("Go to Work", duration=timedelta(hours=1)),
+        task("Job", until=work_end),
+        task("Go to Home", duration=timedelta(hours=1)),
+        task("Family Time", duration=timedelta(hours=1, minutes=30)),
+        task("Eat Food", duration=timedelta(hours=1, minutes=30)),
+        task("Sleep", until=next_day_start),
+    ]

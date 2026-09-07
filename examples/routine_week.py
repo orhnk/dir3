@@ -1,13 +1,16 @@
-import requests
+"""Eine Routine-Woche: Mo-Fr arbeiten, Sa zuhause, So draußen."""
+import at_home
+import hang_out
+import working
+
 from dir3 import week
-import at_home, hang_out, working
 
 week = week(
-    working.day,
-    working.day,
-    working.day,
-    working.day,
-    working.day,
-    at_home.day,
-    hang_out.day
+    mon=working.day,
+    tue=working.day,
+    wed=working.day,
+    thu=working.day,
+    fri=working.day,
+    sat=at_home.day,
+    sun=hang_out.day,
 )

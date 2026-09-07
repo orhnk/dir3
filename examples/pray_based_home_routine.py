@@ -1,23 +1,30 @@
-import requests
-from dir3 import task, next_day_start, prayer
-from datetime import timedelta, time
+"""Ein Tag, der sich an den Gebetszeiten ausrichtet - der munazzim-Fall.
 
-# by default all plans are lazy-loaded. That means, the weather will be calculated, in the Morning 00:00 at that day! If it is not declared different in the dir3.py config
+`ctx.prayer` liefert pro Kalendertag frische Anker (fajr, sunrise, dhuhr,
+asr, maghrib, isha); davon lassen sich mit `- timedelta(...)` abgeleitete
+Anker bauen. Alles wird pro Tag lazy aufgelöst.
+"""
+from datetime import time, timedelta
 
-get_up = time(4,0)
+from dir3 import day as _day
+from dir3 import next_day_start, task
 
-day = [
-    task("Read", from=get_up, until=prayer.sunrise-timedelta(minutes=30)), # First element must have a from parameter!
-    task("Fajr", until=prayer.sunrise), # First element must have a from parameter!
-    task("Arabic Shi'r", duration=timedelta(minutes=51)),
-    task("Breakfast", duration=timedelta(hours=1)),
-    task("Read", until=prayer.dhuhr-timedelta(minutes=10)),
-    task("Dhuhr", until=prayer.dhuhr+timedelta(minutes=30)),
-    task("Research", space=timedelta(hours=1), until=prayer.asr-timedelta(minutes=10)), # if today is rainy, we're not going outside.
-    task("Asr", until=prayer.asr+timedelta(minutes=20)), # if today is rainy, we're not going outside.
-    task("Eat Food", duration=timedelta(hours=1, minutes=30)),
-    task("Family Time", until=prayer.maghrib-timedelta(minutes=10)),
-    task("Maghrib", until=prayer.maghrib+timedelta(minutes=20)),
-    task("Isha", from=prayer.isha-timedelta(minutes=10), until=prayer.isha+timedelta(minutes=30)),
-    task("Sleep", until=next_day_start())
-]
+
+@_day(name="Gebets-Tag")
+def day(ctx):
+    p = ctx.prayer
+    return [
+        task("Read", start=time(4, 0), until=p.sunrise - timedelta(minutes=30)),
+        task("Fajr", until=p.sunrise),
+        task("Arabic Shi'r", duration=timedelta(minutes=51)),
+        task("Breakfast", duration=timedelta(hours=1)),
+        task("Read", until=p.dhuhr - timedelta(minutes=10)),
+        task("Dhuhr", until=p.dhuhr + timedelta(minutes=30)),
+        task("Research", space=timedelta(hours=1), until=p.asr - timedelta(minutes=10)),
+        task("Asr", until=p.asr + timedelta(minutes=20)),
+        task("Eat Food", duration=timedelta(hours=1, minutes=30)),
+        task("Family Time", until=p.maghrib - timedelta(minutes=10)),
+        task("Maghrib", until=p.maghrib + timedelta(minutes=20)),
+        task("Isha", start=p.isha - timedelta(minutes=10), until=p.isha + timedelta(minutes=30)),
+        task("Sleep", until=next_day_start),
+    ]
