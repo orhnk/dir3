@@ -13,7 +13,7 @@ timezone = "Europe/Berlin"
 use_geolocation = true        # auto-detect via ipapi.co when coords are missing
 
 [prayer]
-provider = "auto"             # "auto" | "online" (Aladhan) | "offline"
+provider = "auto"             # "auto" | "online" | "offline" | "aladhan" | "ezanvakti" | "diyanet"
 method = "MWL"                # MWL | ISNA | Egypt | Karachi | Turkey | ...
 madhab = "Shafi"              # Shafi | Hanafi  (affects Asr)
 """

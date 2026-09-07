@@ -28,7 +28,12 @@ nix build                         # installs the `dir3` binary + runs the tests
 ```
 
 An auto-created config lives at `~/.config/dir3/config.toml`
-(auto-detected city via ipapi.co, Aladhan online + offline munazzim fallback).
+(auto-detected city via ipapi.co). Prayer sources, in `[prayer]`:
+
+- `provider = "auto"` (default) — Aladhan first, offline calculator as fallback;
+- `provider = "ezanvakti"` / `"diyanet"` — official Turkish Diyanet per-district
+  times (district resolved from the location; one request per horizon);
+- `provider = "offline"` — never touch the network.
 
 ## The idea
 
