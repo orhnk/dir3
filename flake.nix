@@ -44,6 +44,7 @@
               pypkgs.httpx
               pypkgs.pytest
               pypkgs.ruff
+              self.packages.${system}.default
             ];
             shellHook = ''
               export PYTHONPATH="${toString ./src}:$PYTHONPATH"
