@@ -1,7 +1,10 @@
 """Planfile-Konfiguration (keine TOML) und Geolocation."""
+import json
+from datetime import datetime
 from types import SimpleNamespace as _M
 
 import pytest
+import requests
 
 from dir3 import Dir3Config, LocationSettings, PrayerSettings
 from dir3.services.geo import GeoLocation, GeoLocator
@@ -69,7 +72,7 @@ def test_geo_error_when_no_location_and_no_ip(monkeypatch):
         GeoLocator(config).detect()
 
 
-def test_geo_ip_detect_sends_user_agent(monkeypatch):
+def test_geo_ip_detect_sends_user_agent(monkeypatch, tmp_path):
     captured = {}
 
     def fake_get(url, params=None, timeout=None, headers=None):
@@ -86,6 +89,100 @@ def test_geo_ip_detect_sends_user_agent(monkeypatch):
         return _Response()
 
     monkeypatch.setattr("dir3.services.geo.requests.get", fake_get)
-    location = GeoLocator(Dir3Config()).detect()
+    location = GeoLocator(Dir3Config(), cache_path=tmp_path / "geo.json").detect()
     assert "User-Agent" in captured["headers"]
     assert location == GeoLocation(40.8, 29.43, "Europe/Istanbul", "Gebze", "Türkiye")
+
+
+def _ipapi_response(payload, *, status=200):
+    class _Response:
+        status_code = status
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise requests.HTTPError(f"{self.status_code}")
+
+        def json(self):
+            return payload
+
+    return _Response()
+
+
+def test_geo_result_is_cached_and_reused_offline(monkeypatch, tmp_path):
+    payload = {"latitude": 40.8, "longitude": 29.43, "timezone": "Europe/Istanbul",
+               "city": "Gebze", "country_name": "Türkiye"}
+    cache = tmp_path / "geo.json"
+    fresh = {"calls": 0}
+
+    def fake_get(url, params=None, timeout=None, headers=None):
+        fresh["calls"] += 1
+        return _ipapi_response(payload)
+
+    monkeypatch.setattr("dir3.services.geo.requests.get", fake_get)
+    first = GeoLocator(Dir3Config(), cache_path=cache).detect()
+    assert first == GeoLocation(40.8, 29.43, "Europe/Istanbul", "Gebze", "Türkiye")
+
+    def offline_get(*args, **kwargs):
+        raise requests.ConnectionError("no network")
+
+    monkeypatch.setattr("dir3.services.geo.requests.get", offline_get)
+    second = GeoLocator(Dir3Config(), cache_path=cache).detect()
+    assert second == first
+    assert fresh["calls"] == 1
+
+
+def test_geo_retries_rate_limit_then_succeeds(monkeypatch, tmp_path):
+    payload = {"latitude": 40.8, "longitude": 29.43, "timezone": "Europe/Istanbul",
+               "city": "Gebze", "country_name": "Türkiye"}
+    attempts = {"n": 0}
+
+    def fake_get(url, params=None, timeout=None, headers=None):
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            return _ipapi_response({}, status=429)
+        return _ipapi_response(payload)
+
+    monkeypatch.setattr("dir3.services.geo.requests.get", fake_get)
+    monkeypatch.setattr("dir3.services.geo.time.sleep", lambda _: None)
+    location = GeoLocator(Dir3Config(), cache_path=tmp_path / "geo.json").detect()
+    assert location.city == "Gebze"
+    assert attempts["n"] == 2
+
+
+def test_geo_stale_cache_used_when_offline(monkeypatch, tmp_path):
+    cache = tmp_path / "geo.json"
+    cache.write_text(
+        '{"fetched_at": "2020-01-01T00:00:00+00:00", "latitude": 40.8, '
+        '"longitude": 29.43, "timezone": "Europe/Istanbul", "city": "Gebze", '
+        '"country": "Türkiye"}',
+        encoding="utf-8",
+    )
+
+    def offline_get(*args, **kwargs):
+        raise requests.ConnectionError("no network")
+
+    monkeypatch.setattr("dir3.services.geo.requests.get", offline_get)
+    location = GeoLocator(Dir3Config(), cache_path=cache).detect()
+    assert location == GeoLocation(40.8, 29.43, "Europe/Istanbul", "Gebze", "Türkiye")
+
+
+def test_geo_cache_refreshes_when_fresh_and_network_ok(monkeypatch, tmp_path):
+    cache = tmp_path / "geo.json"
+    cache.write_text(
+        '{"fetched_at": "2020-01-01T00:00:00+00:00", "latitude": 40.8, '
+        '"longitude": 29.43, "timezone": "Europe/Istanbul", "city": "Old", '
+        '"country": "OL"}',
+        encoding="utf-8",
+    )
+    payload = {"latitude": 48.1, "longitude": 11.5, "timezone": "Europe/Berlin",
+               "city": "München", "country_name": "Deutschland"}
+
+    def fake_get(url, params=None, timeout=None, headers=None):
+        return _ipapi_response(payload)
+
+    monkeypatch.setattr("dir3.services.geo.requests.get", fake_get)
+    location = GeoLocator(Dir3Config(), cache_path=cache).detect()
+    assert location.city == "München"  # stale cache was refreshed by the network
+    data = json.loads(cache.read_text(encoding="utf-8"))
+    assert data["city"] == "München"
+    assert datetime.fromisoformat(data["fetched_at"]).tzinfo is not None
