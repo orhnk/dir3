@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from json import JSONDecodeError
 from math import acos, atan, cos, degrees, pi, radians, sin, tan
+from time import monotonic, sleep
 
 import requests
 
@@ -30,8 +31,54 @@ from ..config import DEFAULT_CACHE_DIR, Dir3Config
 from ..timeutils import format_time
 from .geo import GeoLocation, GeoLocator
 
-ALADHAN_API = "https://api.aladhan.com/v1/timings/{day}"
+#: Aladhan returns a whole month in ONE request (fewer calls, gentler on rate
+#: limits/shared IPs than one request per day).
+ALADHAN_CALENDAR = "https://api.aladhan.com/v1/calendar/{year}/{month}"
 EZANVAKTI_API = "https://ezanvakti.imsakiyem.com/api"
+
+#: Minimal pause between two upstream requests (politeness / rate-limit guard).
+_REQUEST_MIN_INTERVAL = 0.12
+_last_request_at = 0.0
+
+#: HTTP statuses worth retrying with backoff (429 = rate limit, 5xx = flaky).
+_RETRYABLE_STATUS = {408, 425, 429, 500, 502, 503, 504}
+
+
+def _pace() -> None:
+    global _last_request_at
+    now = monotonic()
+    wait = _REQUEST_MIN_INTERVAL - (now - _last_request_at)
+    if wait > 0:
+        sleep(wait)
+    _last_request_at = monotonic()
+
+
+def _get_json(
+    url: str,
+    params: dict[str, object] | None = None,
+    *,
+    timeout: float = 10.0,
+    retries: int = 2,
+    backoff: float = 0.6,
+):
+    """GET with small retries for transient failures (rate limits / flaky nets)."""
+    last: Exception | None = None
+    for attempt in range(retries + 1):
+        try:
+            response = requests.get(url, params=params, timeout=timeout)
+            code = getattr(response, "status_code", None)
+            if code in _RETRYABLE_STATUS and attempt < retries:
+                sleep(backoff * (attempt + 1))
+                continue
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as exc:
+            last = exc
+            if attempt < retries:
+                sleep(backoff * (attempt + 1))
+                continue
+            raise exc
+    raise last  # pragma: no cover - defensive
 ALADHAN_METHODS = {
     "MWL": 3,
     "ISNA": 2,
@@ -197,14 +244,33 @@ class IslamicCalculator:
 
 
 class AladhanProvider:
-    """Fetches prayer times from the Aladhan API (like munazzim)."""
+    """Fetches prayer times from the Aladhan API (like munazzim).
+
+    Fetches whole months per request (``/calendar/{year}/{month}``) and memoizes
+    them per instance, so a long horizon costs ~12 requests instead of one per
+    day.  A short request pace keeps shared/office IPs below the free limits.
+    """
 
     name = "aladhan"
 
     def __init__(self, timeout: float = 10.0) -> None:
         self.timeout = timeout
+        self._months: dict[tuple[int, int], dict[date, PrayerSchedule]] = {}
 
     def fetch(self, day: date, location: GeoLocation, config: Dir3Config) -> PrayerSchedule:
+        schedules = self._month(day.year, day.month, location, config)
+        schedule = schedules.get(day)
+        if schedule is None:
+            raise ValueError(f"Aladhan returned no times for {day.isoformat()}")
+        return schedule
+
+    def _month(
+        self, year: int, month: int, location: GeoLocation, config: Dir3Config
+    ) -> dict[date, PrayerSchedule]:
+        key = (year, month)
+        cached = self._months.get(key)
+        if cached is not None:
+            return cached
         method = ALADHAN_METHODS.get(config.prayer.method, 3)
         school = 1 if config.prayer.madhab.lower() == "hanafi" else 0
         params = {
@@ -213,27 +279,41 @@ class AladhanProvider:
             "method": method,
             "school": school,
         }
-        url = ALADHAN_API.format(day=day.isoformat())
-        response = requests.get(url, params=params, timeout=self.timeout)
-        response.raise_for_status()
-        data = response.json().get("data", {}).get("timings", {})
-        times = {
-            key.lower(): _parse_hhmm(t)
-            for key, t in data.items()
-            if key.lower() in PRAYER_KEYS
-        }
-        if "sunrise" not in times:
-            raise ValueError("Aladhan response missing sunrise")
-        from ..timeutils import parse_hhmm
+        _pace()
+        url = ALADHAN_CALENDAR.format(year=year, month=month)
+        payload = _get_json(url, params, timeout=self.timeout)
+        data = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(data, list) or not data:
+            raise ValueError("Aladhan calendar response is empty")
+        schedules: dict[date, PrayerSchedule] = {}
+        for entry in data:
+            timings = entry.get("timings") or {}
+            greg = (entry.get("date") or {}).get("gregorian") or {}
+            try:
+                entry_day = datetime.strptime(str(greg.get("date") or ""), "%d-%m-%Y").date()
+            except (ValueError, TypeError):  # pragma: no cover - bad payload
+                continue
+            times = {
+                name.lower(): _parse_hhmm(raw)
+                for name, raw in timings.items()
+                if name.lower() in PRAYER_KEYS
+            }
+            if "sunrise" not in times:
+                continue
+            from ..timeutils import parse_hhmm
 
-        return PrayerSchedule(
-            fajr=times.get("fajr", parse_hhmm("05:00")),
-            sunrise=times["sunrise"],
-            dhuhr=times.get("dhuhr", parse_hhmm("12:30")),
-            asr=times.get("asr", parse_hhmm("15:30")),
-            maghrib=times.get("maghrib", parse_hhmm("18:05")),
-            isha=times.get("isha", parse_hhmm("19:45")),
-        )
+            schedules[entry_day] = PrayerSchedule(
+                fajr=times.get("fajr", parse_hhmm("05:00")),
+                sunrise=times["sunrise"],
+                dhuhr=times.get("dhuhr", parse_hhmm("12:30")),
+                asr=times.get("asr", parse_hhmm("15:30")),
+                maghrib=times.get("maghrib", parse_hhmm("18:05")),
+                isha=times.get("isha", parse_hhmm("19:45")),
+            )
+        if not schedules:
+            raise ValueError("Aladhan calendar response has no usable entries")
+        self._months[key] = schedules
+        return schedules
 
 
 class EzanVaktiProvider:

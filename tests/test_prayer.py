@@ -6,6 +6,7 @@ from dir3.services import PrayerService
 from dir3.services.geo import GeoLocation
 from dir3.services.prayer import (
     ALADHAN_METHODS,
+    AladhanProvider,
     EzanVaktiProvider,
     IslamicCalculator,
     PrayerSchedule,
@@ -210,22 +211,61 @@ def test_ezanvakti_provider_one_range_request_for_whole_window(monkeypatch):
 
 def test_auto_provider_prefers_aladhan(monkeypatch, tmp_path):
     _use_tmp_cache(monkeypatch, tmp_path)
-    responses = {
-        "https://api.aladhan.com/v1/timings/": {
-            "data": {
-                "timings": {
-                    "Fajr": "04:59 (EET)", "Sunrise": "06:27 (EET)",
-                    "Dhuhr": "13:05 (EET)", "Asr": "16:43 (EET)",
-                    "Maghrib": "19:33 (EET)", "Isha": "20:55 (EET)",
+    calls: list[str] = []
+
+    def calendar_payload(url, params):
+        calls.append(url)
+        return {
+            "data": [
+                {
+                    "timings": {
+                        "Fajr": "04:59 (EET)", "Sunrise": "06:27 (EET)",
+                        "Dhuhr": "13:05 (EET)", "Asr": "16:43 (EET)",
+                        "Maghrib": "19:33 (EET)", "Isha": "20:55 (EET)",
+                    },
+                    "date": {"gregorian": {"date": "07-09-2026"}},
                 }
-            }
+            ]
         }
-    }
+
+    responses = {"https://api.aladhan.com/v1/calendar/": calendar_payload}
     monkeypatch.setattr("dir3.services.prayer.requests.get", _router(responses))
     service = PrayerService(_cfg(provider="auto"))
     schedule = service.get(date(2026, 9, 7), GEBZE)
     assert schedule.fajr == time(4, 59)
     assert service._cache[PrayerService._key("aladhan", date(2026, 9, 7), GEBZE)]
+
+
+def test_aladhan_fetches_one_calendar_request_for_whole_month(monkeypatch):
+    def calendar_payload(url, params):
+        month = int(url.rsplit("/", 1)[1])
+        entries = []
+        for d in range(1, 31):
+            entries.append(
+                {
+                    "timings": {
+                        "Fajr": f"04:{(month + d) % 60:02d}",
+                        "Sunrise": "06:27", "Dhuhr": "13:00", "Asr": "16:00",
+                        "Maghrib": "19:00", "Isha": "20:00",
+                    },
+                    "date": {"gregorian": {"date": f"{d:02d}-09-2026"}},
+                }
+            )
+        return {"data": entries}
+
+    calls: list[str] = []
+
+    def fake_get(url, params=None, timeout=None):
+        calls.append(url)
+        return _FakeResponse(calendar_payload(url, params))
+
+    monkeypatch.setattr("dir3.services.prayer.requests.get", fake_get)
+    provider = AladhanProvider()
+    cfg = _cfg(provider="aladhan")
+    for day_num in (3, 17, 29):
+        provider.fetch(date(2026, 9, day_num), GEBZE, cfg)
+    assert len(calls) == 1  # one calendar request serves the whole month
+    assert provider.fetch(date(2026, 9, 17), GEBZE, cfg).fajr == time(4, 26)  # 04 + (9+17)%60
 
 
 def test_explicit_ezanvakti_provider(monkeypatch, tmp_path):
