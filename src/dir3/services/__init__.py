@@ -37,7 +37,7 @@ class Services:
         self.geo = geo or GeoLocator(self.config)
         self.prayer = prayer or PrayerService(self.config, geolocator=self.geo)
         self.sun = sun or SunService(self.prayer)
-        self.weather = weather or WeatherService()
+        self.weather = weather or WeatherService(location_getter=self.location)
 
     @property
     def location(self) -> GeoLocation:

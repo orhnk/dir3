@@ -1,7 +1,8 @@
 """Weather conditions, evaluated lazily per day (e.g. `ctx.weather.is_rainy()`).
 
 Results are cached per (city, date) so that recompiling the same plan during a
-single day stays deterministic.
+single day stays deterministic.  The city comes from the *plan* (location) or
+the detected location - never from a hardcoded default.
 """
 from __future__ import annotations
 
@@ -12,15 +13,16 @@ from json import JSONDecodeError
 import requests
 
 from ..config import DEFAULT_CACHE_DIR
+from .geo import GeoLocation
 
 WTTR_API = "https://wttr.in/{city}?format=j1"
 
 
 class WeatherService:
-    def __init__(self, default_city: str = "Berlin", timeout: float = 8.0) -> None:
-        self.default_city = default_city
+    def __init__(self, location_getter=None, timeout: float = 8.0, cache_path=None) -> None:
+        self._location_getter = location_getter
         self.timeout = timeout
-        self.cache_path = DEFAULT_CACHE_DIR / "weather.json"
+        self.cache_path = cache_path or DEFAULT_CACHE_DIR / "weather.json"
         self._trend_cache: dict[str, bool | None] = self._load()
 
     def _load(self) -> dict[str, bool | None]:
@@ -32,13 +34,26 @@ class WeatherService:
         except (JSONDecodeError, OSError):  # pragma: no cover - defensive
             return {}
 
+    def _city(self, city: str | None) -> str | None:
+        name = (city or "").strip()
+        if name:
+            return name
+        getter = self._location_getter
+        if getter is not None:
+            try:
+                location: GeoLocation | None = getter()
+                return (location.city or "").strip() or None
+            except Exception:  # pragma: no cover - no location available
+                return None
+        return None
+
     def is_rainy(self, day: date, city: str | None = None) -> bool | None:
         """True when rain chance exceeds 50% in any hour of the given day.
 
-        Returns ``None`` when the forecast cannot be fetched (treated as
-        "unknown / assume dry" by callers).
+        Returns ``None`` when the city is unknown or the forecast cannot be
+        fetched (treated as "unknown / assume dry" by callers).
         """
-        location = (city or self.default_city).strip()
+        location = self._city(city)
         if not location:
             return None
         key = f"{location}:{day.isoformat()}"
