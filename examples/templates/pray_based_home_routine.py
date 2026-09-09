@@ -35,5 +35,5 @@ def day(ctx):
 
 
 def make_plan():
-    """Rufe es direkt auf: `dir3 examples/pray_based_home_routine.py --until 1`."""
+    """Rufe es direkt auf: `dir3 examples/templates/pray_based_home_routine.py --until 1`."""
     return week(mon=day, tue=day, wed=day, thu=day, fri=day, sat=day, sun=day)

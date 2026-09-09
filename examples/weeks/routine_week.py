@@ -1,7 +1,5 @@
 """Eine Routine-Woche: Mo-Fr arbeiten, Sa zuhause, So draußen."""
-import at_home
-import hang_out
-import working
+from templates import at_home, hang_out, working
 
 from dir3 import week
 

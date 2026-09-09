@@ -1,5 +1,5 @@
 """Eine ganze Woche: jeden Tag derselbe Gebets-Routine-Tag."""
-import pray_based_home_routine as pray_based
+from templates import pray_based_home_routine as pray_based
 
 from dir3 import week
 

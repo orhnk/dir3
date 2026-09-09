@@ -10,9 +10,9 @@ calendar instead - ``public_holidays_week.py`` - or force a single day:
 """
 from datetime import time
 
-from public_holidays import is_holiday
-
 from dir3 import day, next_event, prayer, sun, task
+
+from .public_holidays import is_holiday
 
 
 @day(name="Workday")

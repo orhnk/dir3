@@ -6,8 +6,7 @@ mit Offline-Fallback - keine Konfig-Datei nötig:
 
     dir3 examples/dir3.py --until 360
 """
-import pray_based_week
-import routine_week
+from weeks import pray_based_week, routine_week
 
 from dir3 import month
 

@@ -23,9 +23,9 @@ from dir3.services import Services
 # directory ships its own ``dir3.py`` that would otherwise shadow it.
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 sys.path.insert(0, str(EXAMPLES))
-import public_holidays as ph  # noqa: E402
 import public_holidays_week as demo  # noqa: E402
-from workday_templates import workday  # noqa: E402
+from templates import public_holidays as ph  # noqa: E402
+from templates import workday_templates  # noqa: E402
 
 pytest.importorskip("holidays")
 
@@ -111,7 +111,7 @@ def test_calendar_runs_holiday_on_christmas(tmp_path):
 
 
 def test_unless_is_holiday_drops_work_core(tmp_path):
-    forced = _plan(tmp_path, overrides={date(2026, 12, 25).isoformat(): workday})
+    forced = _plan(tmp_path, overrides={date(2026, 12, 25).isoformat(): workday_templates.workday})
     summaries = [e.name for e in forced.days[1].events if e.active]
     assert "Deep work" not in summaries  # unless=is_holiday
     assert "Asr & coffee" not in summaries

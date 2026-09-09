@@ -189,12 +189,10 @@ def test_planfile_examples_compile_as_utf8():
     """Planfiles contain umlauts/arrows; they must decode as UTF-8 on every
     platform (Python source defaults)."""
     examples = Path(__file__).resolve().parent.parent / "examples"
-    names = [
-        "dir3.py", "lebensjahr.py", "ramadan.py", "autopilot.py",
-        "schlafen.py", "pray_based_home_routine.py",
-    ]
-    for name in names:
-        compile((examples / name).read_bytes(), name, "exec")  # noqa: S102
+    for name, path in sorted((p.name, p) for p in examples.rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
+        compile(path.read_bytes(), name, "exec")  # noqa: S102
 
 
 def test_planfile_utf8_attributes_roundtrip():

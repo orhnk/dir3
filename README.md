@@ -278,10 +278,15 @@ Predicates for `unless`, e.g. `regnet(ctx)` → weather-driven days
 | `examples/ramadan.py` | a day from sun/moon-derived anchors: `imsak`, `iftar` |
 | `examples/autopilot.py` | data-driven plan: weather, energy log, gym hours, deadlines |
 | `examples/lebensjahr.py` | one `@calendar` function for a whole year |
-| `examples/public_holidays.py` | legal-holiday engine via the `holidays` library (country + subdivision, works offline) |
-| `examples/workday_templates.py` | workday / weekend templates — deep work that dissolves on public holidays via `unless=is_holiday` |
-| `examples/holiday_templates.py` | free-day template: a holiday follows sun & prayer, not the clock |
 | `examples/public_holidays_week.py` | a `@calendar` timeline: legal holidays free, weekends lighter, Mon-Fri work |
+| `examples/templates/public_holidays.py` | legal-holiday engine via the `holidays` library (country + subdivision, works offline) |
+| `examples/templates/workday_templates.py` | workday / weekend templates — deep work that dissolves on public holidays via `unless=is_holiday` |
+| `examples/templates/holiday_templates.py` | free-day template: a holiday follows sun & prayer, not the clock |
+
+The usual plumbing lives under `examples/templates/` (reusable day factories:
+`working`, `at_home`, `hang_out`, `pray_based_home_routine`) and
+`examples/weeks/` (`routine_week`, `pray_based_week`); the runnable planfiles
+above compose them.
 
 ```bash
 dir3 examples/lebensjahr.py --until 365
