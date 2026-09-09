@@ -337,7 +337,7 @@ def main(argv: list[str] | None = None) -> int:
             parser.error(f"Planfile existiert nicht: {args.planfile}")
         _patch_planfile(args.planfile, client_id, client_secret, refresh)
         print(f"\nPlanfile aktualisiert: {args.planfile}")
-        print("Jetzt ausfuehren:  dir3 <planfile> --sync-gcal")
+        print(f"Jetzt ausfuehren:  dir3 {args.planfile} --sync-gcal")
     else:
         print("\nAchtung: Secrets sind nur in ~/.gcal-helper gespeichert; ein Planfile")
         print("hast du nicht angegeben (--planfile).")
