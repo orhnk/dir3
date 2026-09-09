@@ -20,6 +20,7 @@ dir3 examples/lebensjahr.py --until 365   # one whole year
 dir3 examples/lebensjahr.py --from 2026-03-01
 dir3 examples/ramadan.py --offline        # prayer times offline, no network
 dir3 examples/dir3.py --sync-gcal         # + push the plan into Google Calendar
+dir3 examples/gebets_woche.py --sync-gcal # prayer week live in your calendar
 ```
 
 Python ≥ 3.10 ist nötig (ZoneInfo, Dataclass-Slots). Installation und Start:
@@ -82,6 +83,34 @@ gcal = GoogleCalendar(
 - `--gcal-dry-run` zeigt nur den Umfang, ohne Netzwerk/Credentials.
 - Der GCal-Code pfad nutzt **`httpx` (async)** statt der blocking-`requests`
   für den Rest von dir3.
+
+### GCal-Zugang einmalig einrichten
+
+1. **Google Cloud Console**: Projekt anlegen, Google Calendar API aktivieren,
+   OAuth-Berechtigungsdaten vom Typ „Desktopanwendung" erzeugen →
+   `client_id` / `client_secret`.
+2. Refresh-Token holen (öffnet einmal den Browser für den Consent):
+
+   ```bash
+   dir3-gcal-setup --client-id $CLIENT_ID --client-secret $CLIENT_SECRET
+   ```
+
+   Das Script startet einen Loopback-Redirect auf `127.0.0.1`, tauscht den Code
+   gegen ein Refresh-Token und druckt den fertigen `gcal`-Block zum Einfügen.
+3. Den Block in dein Planfile einfügen:
+
+   ```python
+   from dir3 import GoogleCalendar
+
+   gcal = GoogleCalendar(
+       client_id="…",
+       client_secret="…",
+       refresh_token="…",
+       calendar_id="primary",
+   )
+   ```
+4. Synchronisieren: `dir3 <planfile> --sync-gcal` — wiederholte Läufe
+   aktualisieren vorhandene Events (idempotent per Custom-ID).
 
 ## The idea
 
@@ -238,7 +267,7 @@ dir3 examples/lebensjahr.py --until 365
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -e .[dev]
-python -m pytest tests/        # 105 tests
+python -m pytest tests/        # 108 tests
 ruff check src tests examples
 ```
 

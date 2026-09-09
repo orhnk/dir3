@@ -95,4 +95,19 @@ def make_plan():
     )
 
 
+# --- Google Calendar (optional) ----------------------------------------------
+# Einmalig: dir3-gcal-setup --client-id … --client-secret …  (liefert das
+# Refresh-Token), dann diesen Block hierher einfügen und mit --sync-gcal laufen:
+#
+#   dir3 examples/gebets_woche.py --sync-gcal
+#
+# from dir3 import GoogleCalendar
+# gcal = GoogleCalendar(
+#     client_id="…",
+#     client_secret="…",
+#     refresh_token="…",
+#     calendar_id="primary",
+# )
+
+
 __title__ = "Gebets-Woche"

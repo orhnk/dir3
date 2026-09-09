@@ -21,6 +21,7 @@ dev = ["pytest>=8.0", "ruff>=0.4"]
 
 [project.scripts]
 dir3 = "dir3.cli:main"
+dir3-gcal-setup = "dir3.gcal_setup:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
