@@ -20,12 +20,21 @@ dir3 examples/lebensjahr.py --from 2026-03-01
 dir3 examples/ramadan.py --offline        # prayer times offline, no network
 ```
 
-Install via Nix:
+Python ≥ 3.10 ist nötig (ZoneInfo, Dataclass-Slots). Installation und Start:
 
 ```bash
+# Variante 1 - pip (funktioniert auf jedem Rechner)
+python -m venv .venv && . .venv/bin/activate
+pip install -e .[dev]
+
+# Variante 2 - Nix
 nix develop                       # dev shell with all deps + PYTHONPATH=src
 nix build                         # installs the `dir3` binary + runs the tests
 ```
+
+Abhängigkeiten: `requests` und `tzdata` (damit `ZoneInfo` auch ohne System-tzdb auf
+Windows/Slim-Containern stabil ist). Wird der Standort nirgends gesetzt,
+ermittelt ihn dir3 per Geolocation und cached das Ergebnis (TTL 6 h).
 
 **Kein Config-File** — alles lebt im Python-Planfile. Der Standort bestimmt
 sich automatisch per Geolocation (ipapi.co); optional überschreibst du ihn im
@@ -194,8 +203,13 @@ dir3 examples/lebensjahr.py --until 365
 ## Development
 
 ```bash
-PYTHONPATH=src /tmp/opencode/dir3venv/bin/python -m pytest tests/   # 55 tests
+python -m venv .venv && . .venv/bin/activate
+pip install -e .[dev]
+python -m pytest tests/        # 77 tests
 ruff check src tests examples
 ```
 
-`flake.nix` runs the tests via `pytestCheckHook` in the sandboxed build.
+`flake.nix` runs the tests via `pytestCheckHook` in the sandboxed build. The
+output forces UTF-8 (`errors="replace"`), so rendering never dies on legacy
+consoles (Windows cp1252) - set `DIR3_DEBUG=1` to see full tracebacks instead
+of the compact error message.

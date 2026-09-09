@@ -26,7 +26,7 @@
         {
           default = pypkgs.buildPythonPackage (pyProject // {
             nativeBuildInputs = with pypkgs; [ setuptools wheel ];
-            propagatedBuildInputs = with pypkgs; [ requests astral pytz python-dateutil ];
+            propagatedBuildInputs = with pypkgs; [ requests tzdata ];
             checkInputs = with pypkgs; [ pytest pytestCheckHook ];
           });
         });
@@ -40,9 +40,7 @@
             packages = with pkgs; [
               python3
               pypkgs.requests
-              pypkgs.astral
-              pypkgs.pytz
-              pypkgs.python-dateutil
+              pypkgs.tzdata
               pypkgs.pytest
               pypkgs.ruff
             ];
