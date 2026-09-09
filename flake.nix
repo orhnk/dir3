@@ -26,7 +26,7 @@
         {
           default = pypkgs.buildPythonPackage (pyProject // {
             nativeBuildInputs = with pypkgs; [ setuptools wheel ];
-            propagatedBuildInputs = with pypkgs; [ requests tzdata ];
+            propagatedBuildInputs = with pypkgs; [ requests tzdata httpx ];
             checkInputs = with pypkgs; [ pytest pytestCheckHook ];
           });
         });
@@ -41,6 +41,7 @@
               python3
               pypkgs.requests
               pypkgs.tzdata
+              pypkgs.httpx
               pypkgs.pytest
               pypkgs.ruff
             ];

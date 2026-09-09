@@ -18,6 +18,7 @@ dir3 examples/schlafen.py                 # next 30 days (default)
 dir3 examples/lebensjahr.py --until 365   # one whole year
 dir3 examples/lebensjahr.py --from 2026-03-01
 dir3 examples/ramadan.py --offline        # prayer times offline, no network
+dir3 examples/dir3.py --sync-gcal         # + push the plan into Google Calendar
 ```
 
 Python ≥ 3.10 ist nötig (ZoneInfo, Dataclass-Slots). Installation und Start:
@@ -32,9 +33,10 @@ nix develop                       # dev shell with all deps + PYTHONPATH=src
 nix build                         # installs the `dir3` binary + runs the tests
 ```
 
-Abhängigkeiten: `requests` und `tzdata` (damit `ZoneInfo` auch ohne System-tzdb auf
-Windows/Slim-Containern stabil ist). Wird der Standort nirgends gesetzt,
-ermittelt ihn dir3 per Geolocation und cached das Ergebnis (TTL 6 h).
+Abhängigkeiten: `requests`, `httpx` (nur für den Google-Calendar-Sync) und
+`tzdata` (damit `ZoneInfo` auch ohne System-tzdb auf Windows/Slim-Containern
+stabil ist). Wird der Standort nirgends gesetzt, ermittelt ihn dir3 per
+Geolocation und cached das Ergebnis (TTL 6 h).
 
 **Kein Config-File** — alles lebt im Python-Planfile. Der Standort bestimmt
 sich automatisch per Geolocation (ipapi.co); optional überschreibst du ihn im
@@ -50,6 +52,35 @@ prayer   = "ezanvakti"     # "auto" | "aladhan" | "ezanvakti"/"diyanet" | "offli
 - `prayer = "ezanvakti"` / `"diyanet"` — offizielle türkische Diyanet-Zeiten pro
   Bezirk (Bezirk aus dem Standort aufgelöst; eine Anfrage pro Horizont);
 - `prayer = "offline"` — niemals Netzwerk; `--offline` auf der CLI ist das Kürzel.
+
+## Google Calendar sync
+
+Der kompilierte Plan lässt sich **in Google Calendar schreiben**
+(`dir3 plan.py --sync-gcal`). Die Credentials liegen — wie alles andere — im
+Python-Planfile:
+
+```python
+from dir3 import GoogleCalendar
+
+gcal = GoogleCalendar(
+    client_id="…",
+    client_secret="…",
+    refresh_token="…",
+    calendar_id="primary",   # optional, default "primary"
+)
+```
+
+- OAuth2: `refresh_token` + `client_id`/`client_secret` (Token wird pro Lauf
+  frisch geholt) oder direkt ein `access_token`.
+- Der Sync ist **idempotent**: jedes Event bekommt eine deterministische
+  Custom-ID (`dir3<sha1>`) aus Titel/Datum/Name/Zeiten — ein zweiter Lauf
+  aktualisiert vorhandene Events statt zu duplizieren (POST → 409 → PUT).
+- Events werden in der **Plan-Zeitzone** angelegt (mit explizitem Offset und
+  IANA-Label); Carry-Events (Schlaf bis `next_event`) enden am realen
+  Folge-Morgen.
+- `--gcal-dry-run` zeigt nur den Umfang, ohne Netzwerk/Credentials.
+- Der GCal-Code pfad nutzt **`httpx` (async)** statt der blocking-`requests`
+  für den Rest von dir3.
 
 ## The idea
 
@@ -205,7 +236,7 @@ dir3 examples/lebensjahr.py --until 365
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -e .[dev]
-python -m pytest tests/        # 91 tests
+python -m pytest tests/        # 105 tests
 ruff check src tests examples
 ```
 

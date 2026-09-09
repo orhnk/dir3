@@ -19,6 +19,7 @@ from .core import Month, Week
 from .engine import compile_pattern
 from .render import render_plan
 from .services import Services
+from .services.gcal import GoogleCalendarSyncer, run_sync
 
 
 def _force_utf8_stdout() -> None:
@@ -84,6 +85,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--offline", action="store_true", help="Gebetszeiten rein offline berechnen"
     )
+    parser.add_argument(
+        "--sync-gcal", action="store_true", help="geplante Events in Google Calendar schreiben"
+    )
+    parser.add_argument(
+        "--gcal-dry-run",
+        action="store_true",
+        help="GCal-Sync nur anzeigen (kein Netzwerk, keine Änderungen)",
+    )
     args = parser.parse_args(argv)
 
     if not args.planfile.exists():
@@ -119,6 +128,21 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(f"Standort: {location_text}")
         print(render_plan(plan))
+
+        if args.sync_gcal:
+            gcal = config.calendar
+            if gcal is None or not gcal.is_configured:
+                parser.error(
+                    "GCal-Sync braucht `gcal = GoogleCalendar(...)` im Planfile "
+                    "(client_id, client_secret, refresh_token oder access_token)."
+                )
+            report = run_sync(
+                GoogleCalendarSyncer(gcal),
+                plan,
+                timezone_name=location.timezone or "UTC",
+                dry_run=args.gcal_dry_run,
+            )
+            print(report)
         return 0
     except (RuntimeError, ValueError, OSError) as exc:
         return _friendly_error(exc)

@@ -10,9 +10,17 @@ kein ``config.toml`` wie bei munazzim. Optional können im Planfile stehen::
     prayer = "ezanvakti"
     #    "auto" | "online" | "offline" | "aladhan" | "ezanvakti" | "diyanet"
 
+    # 3) Google-Calendar-Sync (optional): Credentials im Planfile
+    from dir3 import GoogleCalendar
+    gcal = GoogleCalendar(
+        client_id="…", client_secret="…", refresh_token="…",
+        calendar_id="primary",
+    )
+
 Nichts gesetzt? Dann bestimmt dir3 den Standort selbst per Geolocation
 (``ipapi.co``, funktioniert überall) und nutzt standardmäßig Aladhan mit
-offline berechneten Zeiten als Fallback.
+offline berechneten Zeiten als Fallback. Kalender-Sync ist aus, bis das
+Planfile ``gcal = GoogleCalendar(...)`` setzt.
 """
 from __future__ import annotations
 
@@ -40,9 +48,35 @@ class PrayerSettings:
 
 
 @dataclass(slots=True)
+class GoogleCalendar:
+    """Google-Calendar-Sync-Credentials - direkt im Python-Planfile.
+
+    OAuth2-Verfahren:
+      * ``refresh_token`` + ``client_id``/``client_secret`` (empfohlen) oder
+      * ein bereits ausgestelltes ``access_token`` (kurzlebig, wird direkt
+        verwendet ohne Refresh-Token-Endpunkt).
+    ``calendar_id`` ist der Zielkalender (Standard: ``primary``).
+    """
+
+    client_id: str = ""
+    client_secret: str = ""
+    refresh_token: str = ""
+    access_token: str = ""
+    calendar_id: str = "primary"
+
+    @property
+    def is_configured(self) -> bool:
+        """True wenn ein Refresh-Token-Paar oder ein direktes Access-Token vorliegt."""
+        if self.access_token:
+            return True
+        return bool(self.client_id and self.client_secret and self.refresh_token)
+
+
+@dataclass(slots=True)
 class Dir3Config:
     location: LocationSettings = field(default_factory=LocationSettings)
     prayer: PrayerSettings = field(default_factory=PrayerSettings)
+    calendar: GoogleCalendar | None = field(default=None)
 
     @classmethod
     def from_planfile(cls, module) -> Dir3Config:
@@ -82,4 +116,12 @@ class Dir3Config:
         provider = getattr(module, "provider", None)
         if isinstance(provider, str):
             config.prayer.provider = provider
+
+        calendar = getattr(module, "gcal", None)
+        if calendar is None:
+            calendar = getattr(module, "google_calendar", None)
+        if isinstance(calendar, GoogleCalendar):
+            config.calendar = calendar
+        elif isinstance(calendar, dict):
+            config.calendar = GoogleCalendar(**calendar)
         return config

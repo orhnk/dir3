@@ -23,7 +23,12 @@ from .anchor import (
     next_event,
     register,
 )
-from .config import Dir3Config, LocationSettings, PrayerSettings
+from .config import (
+    Dir3Config,
+    GoogleCalendar,
+    LocationSettings,
+    PrayerSettings,
+)
 from .context import DayContext, PrayerGate, SunGate
 from .core import (
     CalendarPattern,
@@ -126,6 +131,7 @@ __all__ = [
     "Dir3Config",
     "LocationSettings",
     "PrayerSettings",
+    "GoogleCalendar",
     "rains",
     "anchor",
     "register",
