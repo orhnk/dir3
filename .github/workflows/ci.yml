@@ -22,7 +22,7 @@ jobs:
           python-version: ${{ matrix.python }}
 
       - name: Install
-        run: python -m pip install -e ".[dev]"
+        run: python -m pip install -e ".[dev,examples]"
 
       - name: Lint
         run: ruff check src tests examples
@@ -32,3 +32,6 @@ jobs:
 
       - name: Smoke (full-offline plan)
         run: python -m dir3 examples/ramadan.py --offline --until 3
+
+      - name: Smoke (holidays & workdays, offline)
+        run: python -m dir3 examples/public_holidays_week.py --offline --until 14

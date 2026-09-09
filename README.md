@@ -19,6 +19,7 @@ dir3 examples/schlafen.py                 # next 30 days (default)
 dir3 examples/lebensjahr.py --until 365   # one whole year
 dir3 examples/lebensjahr.py --from 2026-03-01
 dir3 examples/ramadan.py --offline        # prayer times offline, no network
+dir3 examples/public_holidays_week.py --until 14   # legal holidays + workdays (pip install holidays)
 dir3 examples/dir3.py --sync-gcal         # + push the plan into Google Calendar
 dir3 examples/gebets_woche.py --sync-gcal # prayer week live in your calendar
 ```
@@ -277,9 +278,15 @@ Predicates for `unless`, e.g. `regnet(ctx)` → weather-driven days
 | `examples/ramadan.py` | a day from sun/moon-derived anchors: `imsak`, `iftar` |
 | `examples/autopilot.py` | data-driven plan: weather, energy log, gym hours, deadlines |
 | `examples/lebensjahr.py` | one `@calendar` function for a whole year |
+| `examples/public_holidays.py` | legal-holiday engine via the `holidays` library (country + subdivision, works offline) |
+| `examples/workday_templates.py` | workday / weekend templates — deep work that dissolves on public holidays via `unless=is_holiday` |
+| `examples/holiday_templates.py` | free-day template: a holiday follows sun & prayer, not the clock |
+| `examples/public_holidays_week.py` | a `@calendar` timeline: legal holidays free, weekends lighter, Mon-Fri work |
 
 ```bash
 dir3 examples/lebensjahr.py --until 365
+pip install holidays
+dir3 examples/public_holidays_week.py --offline --until 14
 ```
 
 ## Development

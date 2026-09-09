@@ -18,6 +18,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.4"]
+examples = ["holidays>=0.40"]
 
 [project.scripts]
 dir3 = "dir3.cli:main"

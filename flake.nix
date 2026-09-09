@@ -27,7 +27,7 @@
           default = pypkgs.buildPythonPackage (pyProject // {
             nativeBuildInputs = with pypkgs; [ setuptools wheel ];
             propagatedBuildInputs = with pypkgs; [ requests tzdata httpx ];
-            checkInputs = with pypkgs; [ pytest pytestCheckHook ];
+            checkInputs = with pypkgs; [ pytest pytestCheckHook holidays ];
           });
         });
 
@@ -44,6 +44,7 @@
               pypkgs.httpx
               pypkgs.pytest
               pypkgs.ruff
+              pypkgs.holidays
               self.packages.${system}.default
             ];
             shellHook = ''
