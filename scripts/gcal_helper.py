@@ -13,8 +13,10 @@ Kein Teil von dir3: es importiert nichts aus dem dir3-Paket, du brauchst
 nur ``python3`` (+ einen Browser).
 
 Einmalige Einrichtung: In der Google Cloud Console einen OAuth-Client vom
-Typ "Desktopanwendung" erzeugen, den heruntergeladenen ``client_secret.json``
-nach ``~/.gcal-helper/client_secret.json`` legen (oder ``--client-secrets``).
+Typ "Desktopanwendung" erzeugen und die heruntergeladene ``client_secret*.json``
+in den Download-Ordner legen - das Script findet sie automatisch.
+Nur wenn sie dort (und unter ~/.gcal-helper/) nicht liegt, fragt es nach
+den Werten (oder uebergib die Datei direkt per ``--client-secrets``).
 Danach ist jedes Mal nur noch: Browser oeffnet sich, einloggen, fertig.
 
 Anleitung:
@@ -95,8 +97,22 @@ def _secrets_from_file(path: Path) -> tuple[str, str]:
     return inst.get("client_id") or "", inst.get("client_secret") or ""
 
 
+def _downloads_client_secret() -> Path | None:
+    """Neueste ``client_secret*.json`` aus dem Download-Ordner."""
+    folder = Path.home() / "Downloads"
+    if not folder.is_dir():
+        return None
+    matches = sorted(
+        (p for p in folder.glob("client_secret*.json") if p.is_file()),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    return matches[0] if matches else None
+
+
 def _load_credentials(client_secrets: Path | None) -> tuple[str, str]:
-    """client_id / client_secret - aus --client-secrets, Env, Sidecar oder Konstanten."""
+    """client_id / client_secret - --client-secrets, Env, Downloads, Sidecar
+    oder Konstanten (in dieser Reihenfolge)."""
     if client_secrets is not None:
         if not client_secrets.exists():
             raise SystemExit(f"Client-Secrets-Datei existiert nicht: {client_secrets}")
@@ -107,21 +123,45 @@ def _load_credentials(client_secrets: Path | None) -> tuple[str, str]:
     env = (os.environ.get("GOOGLE_CLIENT_ID", ""), os.environ.get("GOOGLE_CLIENT_SECRET", ""))
     if all(env):
         return env
-    if CLIENT_FILE.exists():
+    for source in (_downloads_client_secret(), CLIENT_FILE):
+        if source is None or not source.exists():
+            continue
         try:
-            return _secrets_from_file(CLIENT_FILE)
+            cid, csecret = _secrets_from_file(source)
         except (OSError, json.JSONDecodeError):
-            pass
+            continue
+        if cid and csecret:
+            print(f"Client-Secrets verwendet: {source}")
+            return cid, csecret
     return DEFAULT_CLIENT_ID, DEFAULT_CLIENT_SECRET
 
 
-def _missing_credentials() -> None:
-    print("Es fehlen noch OAuth-Credentials (einmalige Einrichtung).", file=sys.stderr)
-    print(f"Google Cloud Console ({CONSOLE_URL}): OAuth-Client 'Desktopanwendung'", file=sys.stderr)
-    print("erzeugen und die heruntergeladene client_secret.json ablegen unter:", file=sys.stderr)
-    print(f"  {CLIENT_FILE}", file=sys.stderr)
-    print("oder die Datei direkt per --client-secrets übergeben.", file=sys.stderr)
-    raise SystemExit(1)
+def _ask_credentials() -> tuple[str, str]:
+    """Letzte Ausweichmoeglichkeit: Werte erfragen und fuer spaeter merken."""
+    print("Kein OAuth-client_secret gefunden (weder in ~/Downloads noch in", file=sys.stderr)
+    print(f"{CLIENT_FILE}). Bitte einmalig eingeben:", file=sys.stderr)
+    print(f"  (Google Cloud Console: {CONSOLE_URL})", file=sys.stderr)
+    client_id = input("  client_id: ").strip()
+    client_secret = input("  client_secret: ").strip()
+    if not (client_id and client_secret):
+        print("Abgebrochen - beide Werte werden gebraucht.", file=sys.stderr)
+        raise SystemExit(1)
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    CLIENT_FILE.write_text(
+        json.dumps(
+            {
+                "installed": {
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "redirect_uris": ["http://localhost"],
+                }
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    print(f"Gespeichert unter {CLIENT_FILE} - ab jetzt automatisch gefunden.")
+    return client_id, client_secret
 
 
 def _auth_url(client_id: str, redirect_uri: str) -> str:
@@ -268,7 +308,7 @@ def main(argv: list[str] | None = None) -> int:
 
     client_id, client_secret = _load_credentials(args.client_secrets)
     if not client_id or not client_secret:
-        _missing_credentials()
+        client_id, client_secret = _ask_credentials()
 
     saved = _safe_load(TOKEN_FILE)
     if args.force:

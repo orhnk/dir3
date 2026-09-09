@@ -117,7 +117,8 @@ gcal = GoogleCalendar(
 
    ```bash
    # Einmalig: client_secret.json (Desktopanwendung) aus der Cloud Console
-   # nach ~/.gcal-helper/client_secret.json legen.
+   # in ~/Downloads legen - wird automatisch erkannt (sonst fragt der Helper
+   # einmalig nach den Werten).
    python3 scripts/gcal_helper.py --planfile examples/gebets_woche.py
    ```
 
