@@ -109,6 +109,20 @@ gcal = GoogleCalendar(
        calendar_id="primary",
    )
    ```
+
+   Alternativ — und **nicht Teil von dir3**: das Standalone-Skript
+   `scripts/gcal_helper.py` (reine Standardbibliothek, kein Paket-Import)
+   macht die Schritte 2–3 komplett im Browser und patcht das Planfile direkt:
+
+   ```bash
+   python3 scripts/gcal_helper.py --planfile examples/gebets_woche.py
+   ```
+
+   Beim ersten Lauf fragt es nach Credentials (öffnet die Cloud Console),
+   startet den Loopback-Redirect, tauscht den Code gegen ein Refresh-Token
+   und schreibt den fertigen `gcal`-Block in dein Planfile (inkl.
+   `GoogleCalendar`-Import). Tokens landen wiederverwendbar unter
+   `~/.gcal-helper/`; `--force` erzwingt einen neuen Browser-Flow.
 4. Synchronisieren: `dir3 <planfile> --sync-gcal` — wiederholte Läufe
    aktualisieren vorhandene Events (idempotent per Custom-ID).
 
