@@ -116,8 +116,8 @@ def compile_pattern(
     total_days = _resolve_horizon(until, days)
     if total_days <= 0:
         raise PlanError("compilation horizon must be positive")
-    start = start_date or date.today()
     services = services or Services(config=config)
+    start = start_date or _plan_today(services)
 
     unit = _normalize_unit(pattern)
     day_overrides = dict(overrides or {})
@@ -138,6 +138,26 @@ def compile_pattern(
         plan.days[index] = _compile_day(day_model, ctx)
         ctx._resolve_cache.clear()
     return plan
+
+
+def _plan_today(services: Services | None) -> date:
+    """Today in the *plan's* timezone, not the machine's (portable planning).
+
+    A developer whose machine dwells in another zone (server, CI, travel)
+    still gets the correct day start for the planned location.  Falls back to
+    the machine date when no location/zone can be resolved.
+    """
+    tz = None
+    if services is not None:
+        try:
+            tz = services.location.tzinfo
+        except Exception:  # pragma: no cover - no location resolvable
+            tz = None
+    try:
+        now = datetime.now(tz) if tz is not None else datetime.now()
+    except (ValueError, TypeError):  # pragma: no cover - defensive
+        return date.today()
+    return now.date()
 
 
 def _resolve_horizon(until: timedelta | int | None, days: int | None) -> int:

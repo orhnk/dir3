@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import os
 import sys
 import traceback
 from datetime import date, datetime
@@ -18,6 +19,22 @@ from .core import Month, Week
 from .engine import compile_pattern
 from .render import render_plan
 from .services import Services
+
+
+def _force_utf8_stdout() -> None:
+    """Render output must not die on legacy consoles (e.g. Windows cp1252)."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):  # not a text stream / unsupported
+            pass
+
+
+def _friendly_error(exc: Exception) -> int:
+    if os.environ.get("DIR3_DEBUG"):
+        raise exc
+    print(f"Fehler: {exc}", file=sys.stderr)
+    return 1
 
 
 def _load_module(path: Path):
@@ -52,6 +69,7 @@ def _parse_date(value: str) -> date:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _force_utf8_stdout()
     parser = argparse.ArgumentParser(
         prog="dir3",
         description="Das Leben zeitlich programmieren (weich, anker-basiert).",
@@ -71,36 +89,39 @@ def main(argv: list[str] | None = None) -> int:
     if not args.planfile.exists():
         parser.error(f"Planfile existiert nicht: {args.planfile}")
 
-    module = _load_module(args.planfile)
-    config = Dir3Config.from_planfile(module)
-    if args.offline:
-        config.prayer.provider = "offline"
-    services = Services(config=config)
+    try:
+        module = _load_module(args.planfile)
+        config = Dir3Config.from_planfile(module)
+        if args.offline:
+            config.prayer.provider = "offline"
+        services = Services(config=config)
 
-    pattern = _extract_pattern(module)
-    if pattern is None:
-        parser.error(f"{args.planfile} definiert weder 'plan' noch 'make_plan()'")
+        pattern = _extract_pattern(module)
+        if pattern is None:
+            parser.error(f"{args.planfile} definiert weder 'plan' noch 'make_plan()'")
 
-    plan = compile_pattern(
-        pattern,
-        until=args.until,
-        start_date=args.start,
-        title=getattr(module, "__title__", None) or getattr(module, "__name__", "dir3"),
-        services=services,
-    )
-    location = services.geo.detect()
-    location_text = " · ".join(
-        part
-        for part in (
-            location.city or None,
-            f"{location.latitude:.4f},{location.longitude:.4f}",
-            location.timezone or None,
+        plan = compile_pattern(
+            pattern,
+            until=args.until,
+            start_date=args.start,
+            title=getattr(module, "__title__", None) or getattr(module, "__name__", "dir3"),
+            services=services,
         )
-        if part
-    )
-    print(f"Standort: {location_text}")
-    print(render_plan(plan))
-    return 0
+        location = services.geo.detect()
+        location_text = " · ".join(
+            part
+            for part in (
+                location.city or None,
+                f"{location.latitude:.4f},{location.longitude:.4f}",
+                location.timezone or None,
+            )
+            if part
+        )
+        print(f"Standort: {location_text}")
+        print(render_plan(plan))
+        return 0
+    except (RuntimeError, ValueError, OSError) as exc:
+        return _friendly_error(exc)
 
 
 if __name__ == "__main__":  # pragma: no cover

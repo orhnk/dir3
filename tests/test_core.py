@@ -1,5 +1,6 @@
 """Core scheduling behavior: soft days, anchors, compensation, patterns."""
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
 
@@ -7,7 +8,7 @@ from dir3 import prayer
 from dir3.anchor import all_anchors, next_event
 from dir3.config import Dir3Config, LocationSettings, PrayerSettings
 from dir3.core import PlanError, day, month, task, week
-from dir3.engine import PlanDay, compile_pattern
+from dir3.engine import PlanDay, _plan_today, compile_pattern
 from dir3.services import Services
 
 
@@ -436,3 +437,34 @@ def test_next_event_derived_offset_rolls():
 
 def test_next_event_is_registered():
     assert "next_event" in all_anchors()
+
+
+def test_plan_today_machine_zone():
+    local = datetime.now().astimezone().tzinfo
+    services = SimpleNamespace(location=SimpleNamespace(tzinfo=local))
+    assert _plan_today(services) == datetime.now(local).date()
+
+
+def test_plan_today_foreign_zone_is_deterministic():
+    fixed = timezone(timedelta(hours=14))
+    services = SimpleNamespace(location=SimpleNamespace(tzinfo=fixed))
+    assert _plan_today(services) == datetime.now(fixed).date()
+
+
+def test_plan_today_falls_back_to_machine_without_services():
+    assert _plan_today(None) == date.today()
+
+
+def test_compile_default_start_follows_location_not_machine():
+    from dir3.services.geo import GeoLocation
+
+    fixed = timezone(timedelta(hours=14))
+    services = _services()
+    services.geo._detected = GeoLocation(52.52, 13.405, "+14", "", "")
+
+    @day
+    def anyday(ctx):
+        return [task("X", start=time(9, 0), duration=timedelta(hours=1))]
+
+    plan = compile_pattern(week(mon=anyday), days=1, services=services)
+    assert plan.start == datetime.now(fixed).date()
