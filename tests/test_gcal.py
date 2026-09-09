@@ -18,7 +18,13 @@ from dir3.config import Dir3Config, LocationSettings, PrayerSettings
 from dir3.core import day, task
 from dir3.engine import compile_pattern
 from dir3.services import Services
-from dir3.services.gcal import GCalSyncReport, GoogleCalendarSyncer, run_sync
+from dir3.services.gcal import (
+    GCalClearReport,
+    GCalSyncReport,
+    GoogleCalendarSyncer,
+    run_clear,
+    run_sync,
+)
 
 D0 = "2026-09-09"
 EVENT_ID = re.compile(r"^dir3[0-9a-f]{40}$")
@@ -227,6 +233,83 @@ def test_report_str():
 
 
 # ---------------------------------------------------------------------------
+# Clear: alle dir3-Events aus dem Kalender entfernen
+
+GCAL_EVENT = re.compile(r"^dir3[0-9a-f]{40}$")
+
+
+def _clear_transport(ids=None, pages=1):
+    ids = ids or [f"dir3{'0'*38}{i:02d}" for i in range(4)]
+    calls = {"token": 0, "get": 0, "delete": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "oauth2.googleapis.com":
+            calls["token"] += 1
+            return httpx.Response(200, json={"access_token": "ya29.fake", "expires_in": 3600})
+        if request.method == "GET":
+            calls["get"] += 1
+            page_token = dict(request.url.params).get("pageToken")
+            if page_token == "t1":
+                return httpx.Response(200, json={"items": [{"id": ids[-1]}]})
+            if pages > 1:
+                rest = {"nextPageToken": "t1", "items": [{"id": i} for i in ids[:-1]]}
+                return httpx.Response(200, json=rest)
+            return httpx.Response(200, json={"items": [{"id": i} for i in ids]})
+        calls["delete"] += 1
+        assert GCAL_EVENT.match(request.url.path.rsplit("/", 1)[-1])
+        return httpx.Response(204, json={})
+
+    return httpx.MockTransport(handler), calls
+
+
+def test_clear_deletes_dir3_events():
+    transport, calls = _clear_transport()
+    report = run_clear(_syncer(transport))
+
+    assert report == GCalClearReport(deleted=4, dry_run=False)
+    assert calls["delete"] == 4
+    assert calls["get"] == 1
+    assert "4 Events geloescht" in str(report)
+
+
+def test_clear_ignores_calendar_creation_events():
+    transport, calls = _clear_transport(pages=1)
+    report = run_clear(_syncer(transport))
+    assert report.deleted == 4
+    # POST für ein Erstellen-zuerst-Event darf nicht passieren: nur DELETE
+    assert "post" not in calls or calls.get("post", 0) == 0
+
+
+def test_clear_paginates():
+    transport, calls = _clear_transport(pages=2)
+    report = run_clear(_syncer(transport))
+
+    assert report.deleted == 4
+    assert calls["get"] == 2
+    assert calls["delete"] == 4
+
+
+def test_clear_dry_run_only_lists():
+    transport, calls = _clear_transport()
+    report = run_clear(_syncer(transport), dry_run=True)
+
+    assert report == GCalClearReport(deleted=4, dry_run=True)
+    assert calls["delete"] == 0
+    assert "wuerde 4 Events loeschen" in str(report)
+
+
+def test_clear_empty_list_no_deletes():
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "oauth2.googleapis.com":
+            return httpx.Response(200, json={"access_token": "ya29.fake", "expires_in": 3600})
+        return httpx.Response(200, json={"items": []})
+
+    transport = httpx.MockTransport(handler)
+    report = run_clear(_syncer(transport))
+    assert report.deleted == 0
+
+
+# ---------------------------------------------------------------------------
 # CLI-Verdrahtung
 
 
@@ -284,4 +367,34 @@ def test_cli_sync_gcal_missing_credentials(tmp_path, monkeypatch):
     )
     with pytest.raises(SystemExit) as exc:
         cli.main([str(planfile), "--offline", "--sync-gcal"])
+    assert exc.value.code == 2
+
+
+def test_cli_gcal_clear_flag(tmp_path, monkeypatch, capsys):
+    planfile = tmp_path / "gcal_plan.py"
+    planfile.write_text(INTEGRATION_PLAN, encoding="utf-8")
+    recorded = {}
+
+    def fake_syncer(settings, *, transport=None, timeout=10.0):
+        recorded["settings"] = settings
+        return object()
+
+    def fake_run(syncer, *, dry_run):
+        recorded["dry"] = dry_run
+        return GCalClearReport(deleted=3, dry_run=False)
+
+    monkeypatch.setattr(cli, "GoogleCalendarSyncer", fake_syncer)
+    monkeypatch.setattr(cli, "run_clear", fake_run)
+
+    assert cli.main([str(planfile), "--offline", "--until", "1", "--gcal-clear"]) == 0
+    assert recorded["settings"].is_configured
+    assert recorded["dry"] is False
+    assert "3 Events geloescht" in capsys.readouterr().out
+
+
+def test_cli_gcal_clear_mutually_exclusive(tmp_path):
+    planfile = tmp_path / "gcal_plan.py"
+    planfile.write_text(INTEGRATION_PLAN, encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        cli.main([str(planfile), "--offline", "--sync-gcal", "--gcal-clear"])
     assert exc.value.code == 2

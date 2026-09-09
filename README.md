@@ -81,6 +81,8 @@ gcal = GoogleCalendar(
   IANA-Label); Carry-Events (Schlaf bis `next_event`) enden am realen
   Folge-Morgen.
 - `--gcal-dry-run` zeigt nur den Umfang, ohne Netzwerk/Credentials.
+- `dir3 plan.py --gcal-clear` entfernt alle von dir3 angelegten Events wieder
+  aus dem Kalender (nur solche mit dem `private.dir3=1`-Marker; nichts anderes).
 - Der GCal-Code pfad nutzt **`httpx` (async)** statt der blocking-`requests`
   für den Rest von dir3.
 

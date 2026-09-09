@@ -52,6 +52,18 @@ class GCalSyncReport:
         return " · ".join(parts)
 
 
+@dataclass(frozen=True, slots=True)
+class GCalClearReport:
+    deleted: int
+    dry_run: bool
+
+    def __str__(self) -> str:
+        noun = "Event" if self.deleted == 1 else "Events"
+        if self.dry_run:
+            return f"GCal: wuerde {self.deleted} {noun} loeschen"
+        return f"GCal: {self.deleted} {noun} geloescht"
+
+
 class GoogleCalendarSyncer:
     def __init__(self, settings: GoogleCalendar, *, transport=None, timeout: float = 10.0) -> None:
         self.settings = settings
@@ -152,10 +164,60 @@ class GoogleCalendarSyncer:
                 response.raise_for_status()
         return GCalSyncReport(total=len(staged), created=created, updated=updated, dry_run=False)
 
+    async def list_dir3_event_ids(self) -> list[str]:
+        """Alle Events, die dir3 angelegt hat (Marker ``private.dir3=1``)."""
+        token = await self.access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+        calendar = quote(self.settings.calendar_id, safe="")
+        ids: list[str] = []
+        page_token = None
+        async with self._new_client() as client:
+            while True:
+                params = {
+                    "maxResults": "2500",
+                    "singleEvents": "true",
+                    "privateExtendedProperty": "dir3=1",
+                    "fields": "nextPageToken,items(id)",
+                }
+                if page_token:
+                    params["pageToken"] = page_token
+                response = await client.get(
+                    f"{API_BASE}/calendars/{calendar}/events", params=params, headers=headers
+                )
+                response.raise_for_status()
+                data = response.json()
+                ids.extend(item["id"] for item in data.get("items", []) if item.get("id"))
+                page_token = data.get("nextPageToken")
+                if not page_token:
+                    return ids
+
+    async def clear(self, *, dry_run: bool = False) -> GCalClearReport:
+        ids = await self.list_dir3_event_ids()
+        if dry_run or not ids:
+            return GCalClearReport(deleted=len(ids), dry_run=dry_run)
+        token = await self.access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+        calendar = quote(self.settings.calendar_id, safe="")
+        deleted = 0
+        async with self._new_client() as client:
+            for event_id in ids:
+                response = await client.delete(
+                    f"{API_BASE}/calendars/{calendar}/events/{quote(event_id, safe='')}",
+                    headers=headers,
+                )
+                response.raise_for_status()
+                deleted += 1
+        return GCalClearReport(deleted=deleted, dry_run=False)
+
 
 def run_sync(syncer: GoogleCalendarSyncer, plan, *, timezone_name: str, dry_run: bool = False):
     """Sync-Wrapper für den synchronen CLI-Pfad."""
     return asyncio.run(syncer.sync(plan, timezone_name=timezone_name, dry_run=dry_run))
+
+
+def run_clear(syncer: GoogleCalendarSyncer, *, dry_run: bool = False):
+    """Clear-Wrapper für den synchronen CLI-Pfad."""
+    return asyncio.run(syncer.clear(dry_run=dry_run))
 
 
 def _aware(dt, tz):
