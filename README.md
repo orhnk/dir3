@@ -14,6 +14,7 @@ whole calendar into a concrete printable plan.
 
 ```bash
 # run a plan file
+dir3 examples/gebets_woche.py           # a prayer-based week (weekday + weekend)
 dir3 examples/schlafen.py                 # next 30 days (default)
 dir3 examples/lebensjahr.py --until 365   # one whole year
 dir3 examples/lebensjahr.py --from 2026-03-01
@@ -222,6 +223,7 @@ Predicates for `unless`, e.g. `regnet(ctx)` → weather-driven days
 
 | file | shows |
 |------|-------|
+| `examples/gebets_woche.py` | a whole prayer-based week: 5 Salawat (5 min before the Adhan, Rakat×2 min) plus Qaylulah, weekday & weekend variants |
 | `examples/schlafen.py` | `until=next_event` — sleep until tomorrow's first event |
 | `examples/ramadan.py` | a day from sun/moon-derived anchors: `imsak`, `iftar` |
 | `examples/autopilot.py` | data-driven plan: weather, energy log, gym hours, deadlines |
