@@ -205,9 +205,15 @@ dir3 examples/lebensjahr.py --until 365
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -e .[dev]
-python -m pytest tests/        # 77 tests
+python -m pytest tests/        # 91 tests
 ruff check src tests examples
 ```
+
+Cross-platform: `tests/test_portability.py` simulates the machine-dependent
+failure modes (legacy console encodings, missing system tzdb, read-only/corrupt
+cache dirs, non-ASCII planfiles) so they fail *before* hitting a real machine.
+`.github/workflows/ci.yml` runs the whole suite on ubuntu/macOS/Windows and
+Python 3.10/3.12/3.14 plus a full-offline CLI smoke test.
 
 `flake.nix` runs the tests via `pytestCheckHook` in the sandboxed build. The
 output forces UTF-8 (`errors="replace"`), so rendering never dies on legacy
