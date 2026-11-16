@@ -35,6 +35,7 @@ object PlanRepository {
                 file.writeText(json, Charsets.UTF_8)
                 temp.delete()
             }
+            CalendarWidget.updateAll(context)
         } catch (_: Exception) {
             // A full disk must not take the alarm engine down.
         }

@@ -1,4 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">dir3</string>
+
+    <!-- Home-screen widget -->
+    <string name="widget_description">Bugünün planı, eventler ve sonraki alarm</string>
+    <string name="widget_empty">Bugün event yok</string>
+    <string name="widget_no_plan">Plan yok — uygulamayı aç</string>
+    <string name="widget_footer_hint">Uygulamayı aç, sunucuya bağlan</string>
+    <string name="widget_refresh">Yenile</string>
+    <string name="widget_more">daha fazla event</string>
+    <string name="widget_alarm_badge">Alarmlı event</string>
+    <string name="widget_next_alarm">⏰ %1$s · %2$s</string>
+    <string name="widget_tomorrow">Yarın %1$s %2$s</string>
+    <string name="widget_last_sync">Son senkron %1$s</string>
 </resources>

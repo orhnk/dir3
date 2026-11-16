@@ -184,7 +184,24 @@ sind **nicht** Teil des Python-Plans und werden daher nicht nach Google
 Calendar gespiegelt — dafuer den Event als `task(...)` in den Plan schreiben
 (das Telefon kann den Planfile editieren).
 
-### 7. Alarm-Rechte
+### 7. Widget auf dem Home-Screen
+
+Ein Kalender-Widget im Stil des Google-Calendar-Widgets, gefuellt aus dem
+lokalen Plan-Cache (funktioniert also auch, wenn der PC aus ist):
+
+* 4×2 Zellen, frei verkleiner- und vergroesserbar (bis ~10 Zeilen).
+* Kopfzeile: Wochentag + Datum, rechts `↻` fuer einen Hintergrund-Sync.
+* Zeilen: Uhrzeit, Farbbalken, Event-Name; ein `⏰` markiert Events, die
+  tatsaechlich klingeln. Bereits beendete Events werden gedimmt.
+* Fusszeile: naechster Alarm (`⏰ 05:33 Fajr`) oder der letzte Sync.
+* Tippen auf eine Zeile oeffnet die App direkt an diesem Tag; Tippen auf
+  die Kopfzeile oeffnet den heutigen Tag.
+* Aktualisiert sich alle 30 Minuten, nach jedem Sync und nach jeder
+  Alarm-Neuberechnung.
+
+Hinzufuegen: Home-Screen lange druecken → *Widgets* → *dir3* → Widget ziehen.
+
+### 8. Alarm-Rechte
 
 Beim ersten Start fragt die App nach Benachrichtigungen und Kamera (Taschenlampe).
 Zusaetzlich in *Ayarlar → Alarm izinleri*:
@@ -201,7 +218,7 @@ Die App nutzt `AlarmManager.setAlarmClock`: exakt, Doze-fest und mit dem
 System-Wecker-Symbol. Ohne exakte Rechte faellt sie auf
 `setAndAllowWhileIdle` zurueck, statt den Alarm still zu verlieren.
 
-### 8. Eigene Alarmtoene
+### 9. Eigene Alarmtoene
 
 Audio-Dateien nach `android/app/src/main/assets/sounds/` legen und im Plan
 referenzieren:
@@ -219,7 +236,7 @@ den System-Alarmton zurueck. Fuer die Sprachausgabe nutzt sie die
 Android-TTS-Stimme (Systemsprache; eigene Sprache ueber
 `Prefs.ttsLanguage`, aktuell noch ohne UI-Feld).
 
-### 9. Grenzen
+### 10. Grenzen
 
 * **Timer, Stoppuhr, Weltuhr** aus Clock sind keine Plan-Events und daher
   nicht Teil von dir3. Alle *Alarm*-Funktionen (Label, Ton, Zufallston, TTS,
@@ -232,7 +249,7 @@ Android-TTS-Stimme (Systemsprache; eigene Sprache ueber
 * Manche Hersteller beenden Hintergrunddienste aggressiv. Die App zeigt die
   noetigen Schalter, kann sie aber nicht erzwingen.
 
-### 10. JSON-Export ohne App
+### 11. JSON-Export ohne App
 
 `dir3 export` ist derselbe Plan, den `dir3 serve` liefert:
 

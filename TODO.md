@@ -51,5 +51,8 @@ Stand 2026-11-15: alle Punkte umgesetzt.
   Alarm-Trigger) und **`dir3 serve`** als LAN-API/CLI-Panel.
 - [x] **CLI auf dem Telefon**: Compile/Sync/Clear/Dry-run mit echter Ausgabe.
 - [x] **README**: Installation, APK-Bau (Actions/Studio), Rechte, Grenzen.
+- [x] **Widget** (4×2, resizable): Tagesplan aus dem Cache, Farbbalken,
+  Alarm-Badge, naechster Alarm in der Fusszeile, `↻`-Sync, Tap oeffnet den
+  Tag in der App.
 - [ ] **Nicht geplant**: Timer/Stoppuhr/Weltuhr aus Clock (keine
   Plan-Events); Power-Knopf-Dismiss wird auf Lautstaerketasten abgebildet.

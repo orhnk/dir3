@@ -24,10 +24,12 @@ import android.widget.Toast
  */
 class MainActivity : Activity() {
     private lateinit var webView: WebView
+    private var pendingDate: String? = null
 
     @Suppress("DEPRECATION")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingDate = intent?.getStringExtra(EXTRA_DATE)
         webView = WebView(this).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -48,7 +50,12 @@ class MainActivity : Activity() {
                 setSupportZoom(false)
                 textZoom = 100
             }
-            webViewClient = WebViewClient()
+            webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    focusDate()
+                }
+            }
             webChromeClient = WebChromeClient()
             addJavascriptInterface(WebBridge(this@MainActivity, this), "Dir3Bridge")
             loadUrl("file:///android_asset/index.html")
@@ -163,6 +170,24 @@ class MainActivity : Activity() {
         ).show()
     }
 
+    /** A widget tap carries the tapped day; jump the calendar there once. */
+    private fun focusDate() {
+        val date = pendingDate ?: return
+        pendingDate = null
+        if (!::webView.isInitialized || !DATE_PATTERN.matches(date)) return
+        webView.evaluateJavascript(
+            "window.dir3FocusDate && window.dir3FocusDate('$date')", null
+        )
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        if (intent == null) return
+        setIntent(intent)
+        pendingDate = intent.getStringExtra(EXTRA_DATE)
+        focusDate()
+    }
+
     override fun onResume() {
         super.onResume()
         if (::webView.isInitialized) {
@@ -179,7 +204,9 @@ class MainActivity : Activity() {
     }
 
     companion object {
+        const val EXTRA_DATE = "date"
         private const val PERMISSION_REQUEST = 1001
         private const val RINGTONE_REQUEST = 1002
+        private val DATE_PATTERN = Regex("^\\d{4}-\\d{2}-\\d{2}$")
     }
 }

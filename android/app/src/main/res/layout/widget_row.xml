@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rowRoot"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingTop="3dp"
+    android:paddingBottom="3dp">
+
+    <View
+        android:id="@+id/rowColor"
+        android:layout_width="3dp"
+        android:layout_height="18dp"
+        android:background="#46d6db" />
+
+    <TextView
+        android:id="@+id/rowTime"
+        android:layout_width="46dp"
+        android:layout_height="wrap_content"
+        android:paddingStart="9dp"
+        android:textColor="#c9d1d9"
+        android:textSize="11sp" />
+
+    <TextView
+        android:id="@+id/rowName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="#ffffff"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/rowBell"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:contentDescription="@string/widget_alarm_badge"
+        android:paddingStart="4dp"
+        android:text="⏰"
+        android:textSize="10sp"
+        android:visibility="gone" />
+</LinearLayout>

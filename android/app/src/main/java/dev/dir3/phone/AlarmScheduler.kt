@@ -121,6 +121,7 @@ object AlarmScheduler {
             }
         }
         Prefs.setScheduledIds(context, scheduled)
+        CalendarWidget.updateAll(context)
     }
 
     private fun scheduleOne(

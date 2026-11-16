@@ -132,6 +132,9 @@
     if (force) query += '&refresh=1';
     return api(query).then(function (doc) {
       applyPlan(doc);
+      // Hand the fresh plan to the native side: it caches, re-schedules the
+      // Android alarms and repaints the home-screen widget.
+      bridge('applyPlan', JSON.stringify(doc));
       setOnline(true);
       return doc;
     }).catch(function (err) {
@@ -266,6 +269,17 @@
     var events = (state.plan.events || []).filter(function (event) { return event.start; }).map(toCalendarEvent);
     if (events.length) state.calendar.createEvents(events);
     refreshRangeLabel();
+    applyFocus();
+  }
+
+  // A home-screen widget tap asks for one specific day (YYYY-MM-DD).
+  function applyFocus() {
+    if (!pendingFocus || !state.calendar) return;
+    var day = new Date(pendingFocus + 'T12:00:00');
+    pendingFocus = null;
+    if (isNaN(day.getTime())) return;
+    try { state.calendar.setDate(day); } catch (err) { return; }
+    switchTab('calendar');
   }
 
   // toastui hands back Date objects in v2, plain date strings in some builds.
@@ -703,6 +717,12 @@
     refreshStatus();
     loadFiles();
   }
+
+  var pendingFocus = null;
+  window.dir3FocusDate = function (date) {
+    pendingFocus = typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
+    applyFocus();
+  };
 
   // Native back button: close the editor/dialog first, leave the app last.
   window.dir3HandleBack = function () {

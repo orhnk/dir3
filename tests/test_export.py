@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 from dir3 import alarm, task, week
 from dir3.alarm import alarm_from_dict
-from dir3.config import Dir3Config
+from dir3.config import Dir3Config, LocationSettings
 from dir3.engine import compile_pattern
 from dir3.export import phone_event_to_doc, plan_to_dict
 from dir3.services import Services
@@ -24,7 +24,9 @@ def _plan():
 
     return compile_pattern(
         week(mon=day_fn), days=1, start_date=date(2026, 11, 16),
-        services=Services(config=Dir3Config()),
+        services=Services(config=Dir3Config(
+            location=LocationSettings(latitude=52.52, longitude=13.405, timezone="Europe/Berlin"),
+        )),
     )
 
 

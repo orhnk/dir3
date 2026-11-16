@@ -14,7 +14,7 @@ from dir3.alarm import (
     coerce_alarm,
     parse_offset,
 )
-from dir3.config import Dir3Config
+from dir3.config import Dir3Config, LocationSettings
 from dir3.engine import compile_pattern
 from dir3.services import Services
 
@@ -73,7 +73,10 @@ def test_task_carries_alarm_and_opt_out():
 
 
 def _compile(tasks, *, alarms: AlarmSettings | None = None):
-    config = Dir3Config(alarms=alarms or AlarmSettings())
+    config = Dir3Config(
+        alarms=alarms or AlarmSettings(),
+        location=LocationSettings(latitude=52.52, longitude=13.405, timezone="Europe/Berlin"),
+    )
 
     def day_fn(ctx):
         return tasks

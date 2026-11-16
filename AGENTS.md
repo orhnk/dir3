@@ -15,7 +15,7 @@ This file gives Codebuff context about your project: goals, commands, convention
   - `src/dir3/export.py` — plan → phone JSON (events, hex colours, resolved alarm triggers); also `dir3 export`.
   - `src/dir3/server.py` — `dir3 serve`: plan/file/event API, token auth, whitelisted CLI runner.
   - `src/dir3/phone_ui/` — the single web UI (calendar via Toast UI Calendar, editor via CodeMirror). Served by the Python server **and** copied into the APK as assets.
-  - `android/` — native Kotlin shell: WebView host, `AlarmManager` scheduling, foreground alarm service, TTS, full-screen alarm activity. No AndroidX dependencies.
+  - `android/` — native Kotlin shell: WebView host, `AlarmManager` scheduling, foreground alarm service, TTS, full-screen alarm activity, plus `CalendarWidget` (RemoteViews home-screen widget fed from the cached plan JSON). No AndroidX dependencies.
 - Data flow: planfile → `compile_pattern` → `alarm.apply_wake_alarms` per day → `Plan` → `plan_to_dict` → `/api/plan` → phone cache → `AlarmScheduler`.
 - Phone edits flow back via `PUT /api/file` (atomic write + `.dir3/backups/`). One-off phone events live in `.dir3/phone_events.json` and are merged at export time.
 
