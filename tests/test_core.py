@@ -7,7 +7,7 @@ import pytest
 from dir3 import prayer
 from dir3.anchor import all_anchors, next_event
 from dir3.config import Dir3Config, LocationSettings, PrayerSettings
-from dir3.core import PlanError, day, month, task, week
+from dir3.core import PlanError, Todo, day, month, task, week
 from dir3.engine import PlanDay, _plan_today, compile_pattern
 from dir3.services import Services
 
@@ -76,6 +76,76 @@ def test_space_gap_before_task():
     ]
 
 
+def test_task_list_is_carried_to_planned_event():
+    @day
+    def d(ctx):
+        return [
+            task(
+                "Wucūbāt lesen",
+                start=time(19, 45),
+                duration=timedelta(hours=1),
+                task_list="Wucūbāt",
+            )
+        ]
+
+    plan = compile_pattern(d, days=1, start_date=D0, services=_services())
+    assert plan.days[0].events[0].task_list == "Wucūbāt"
+
+
+def test_task_list_must_not_be_blank():
+    with pytest.raises(PlanError):
+        task("X", start=time(9, 0), duration=timedelta(minutes=5), task_list="  ")
+
+
+def test_todo_position_and_attached_todos_are_carried_to_planned_event():
+    @day
+    def d(ctx):
+        return [
+            task(
+                "Hitam",
+                start=time(20, 29),
+                duration=timedelta(minutes=15),
+                task_list="Hitam",
+                todo_position="start",
+                todos=(
+                    Todo("K", todo_position="end"),
+                    Todo("R"),
+                    "P",
+                ),
+            )
+        ]
+
+    plan = compile_pattern(d, days=1, start_date=D0, services=_services())
+    event = plan.days[0].events[0]
+    assert event.todo_position == "start"
+    assert [(todo.title, todo.todo_position) for todo in event.todos] == [
+        ("K", "end"),
+        ("R", "end"),
+        ("P", "end"),
+    ]
+
+
+def test_todos_need_a_task_list_and_valid_position():
+    with pytest.raises(PlanError):
+        task("X", start=time(9, 0), duration=timedelta(minutes=5), todos=("K",))
+    with pytest.raises(PlanError):
+        task(
+            "X",
+            start=time(9, 0),
+            duration=timedelta(minutes=5),
+            task_list="L",
+            todo_position="middle",
+        )
+    with pytest.raises(PlanError):
+        task(
+            "X",
+            start=time(9, 0),
+            duration=timedelta(minutes=5),
+            task_list="L",
+            todos=(Todo("  "),),
+        )
+
+
 def test_until_anchor_is_authoritative():
     services = _services()
 
@@ -116,8 +186,9 @@ def test_anchor_resolution_is_cached_within_a_day():
     for pday in plan.days:
         noon = pday.events[0].start.time()
         assert time(11, 30) <= noon <= time(14, 0)
-    # cache holds exactly one entry per anchor name, not per call
-    assert cache_sizes == [1] * 5  # dhuhr cached once, second resolve is cache hit
+    # cache holds exactly one entry per anchor name, not per call; the engine
+    # also compiles one lookahead day for the last day's next_event.
+    assert cache_sizes == [1] * 6  # dhuhr cached once, second resolve is a hit
 
 
 def test_unless_skips_task_for_a_day():
@@ -142,7 +213,9 @@ def test_unless_skips_task_for_a_day():
             assert pday.skipped_count == 1
         else:
             assert "Work" in names
-    assert len(called_on) == 7  # evaluated once per day, not once at import
+    # evaluated once per day (plus one lookahead day for next_event), not once
+    # at import
+    assert sorted(called_on) == [D0 + timedelta(days=i) for i in range(8)]
 
 
 def test_soft_day_keeps_slack():
@@ -324,6 +397,58 @@ def test_post_midnight_wrap_still_rejects_real_overlap():
         compile_pattern(kaputt, days=1, start_date=D0, services=_services())
 
 
+def test_overlap_flag_allows_pinned_blocks_to_intersect():
+    """Marked tasks may overlap earlier pinned blocks (prayer inside lecture)."""
+
+    @day
+    def tag(ctx):
+        return [
+            task("Vorlesung A", start=time(10, 0), until=time(11, 45), flex=False),
+            task(
+                "Gebet",
+                start=time(10, 5),
+                duration=timedelta(minutes=8),
+                flex=False,
+                overlap=True,
+            ),
+            task(
+                "Vorlesung B",
+                start=time(11, 40),
+                until=time(12, 30),
+                flex=False,
+                overlap=True,
+            ),
+        ]
+
+    plan = compile_pattern(tag, days=1, start_date=D0, services=_services())
+    gebet = plan.days[0].events[1]
+    vorlesung_b = plan.days[0].events[2]
+    assert (gebet.start.time(), gebet.end.time()) == (time(10, 5), time(10, 13))
+    assert vorlesung_b.start.time() == time(11, 40)
+
+
+def test_overlap_flag_still_rolls_post_midnight_anchor():
+    """Marked overlap must not break the post-midnight rollover."""
+
+    @day
+    def nacht(ctx):
+        return [
+            task("Abendblock", start=time(18, 0), until=time(23, 0), flex=False),
+            task(
+                "Spaetgebet",
+                start=time(1, 0),
+                duration=timedelta(minutes=10),
+                flex=False,
+                overlap=True,
+            ),
+        ]
+
+    plan = compile_pattern(nacht, days=1, start_date=D0, services=_services())
+    ev = plan.days[0].events[1]
+    assert ev.start.date() == D0 + timedelta(days=1)
+    assert ev.start.time() == time(1, 0)
+
+
 def test_day_decorator_start_kwarg_plain_time():
     """@day(name=..., start=...) pins the first task to the day start."""
 
@@ -344,9 +469,16 @@ def test_day_decorator_start_kwarg_anchor():
     def frueh(ctx):
         return [task("Stille", duration=timedelta(minutes=15))]
 
-    plan = compile_pattern(frueh, days=1, start_date=D0, services=_services())
+    services = _services()
+    # Pin the method: with ``method_auto`` the offline path picks the nearest
+    # authority from the cached Aladhan table (Berlin -> France, 12°), so the
+    # angle - and with it the assertion below - would depend on the cache.
+    services.prayer.method_auto = False
+    services.prayer.method = 13
+    plan = compile_pattern(frueh, days=1, start_date=D0, services=services)
     start = plan.days[0].events[0].start.time()
-    # Berlin, June: fajr is just past midnight (01:07)
+    # Berlin, June: no astronomical twilight; the sun never reaches -18°, so the
+    # clamped calculation lands on solar midnight (01:07).
     assert start.hour == 1
 
 
@@ -402,17 +534,26 @@ def test_next_event_skips_free_days():
     assert sleep.end.time() == time(6, 0)
 
 
-def test_next_event_last_horizon_day_falls_back():
-    """Without a successor the task stays open until the end of the day."""
+def test_next_event_last_horizon_day_looks_at_the_successor():
+    """The last planned day still ends at the next day's first event."""
 
     @day
     def abend(ctx):
         return [task("Schlafen", start=time(23, 0), until=next_event)]
 
-    plan = compile_pattern(abend, days=1, start_date=D0, services=_services())
+    @day
+    def morgen(ctx):
+        return [task("Aufstehen", start=time(6, 0), duration=timedelta(hours=1))]
+
+    plan = compile_pattern(
+        week(mon=abend, tue=morgen), days=1, start_date=D0, services=_services()
+    )
+    assert len(plan.days) == 1
     sleep = plan.days[0].events[0]
-    assert sleep.open_
-    assert not sleep.carry
+    assert not sleep.open_
+    assert sleep.end.date() == D0 + timedelta(days=1)
+    assert sleep.end.time() == time(6, 0)
+    assert sleep.carry
 
 
 def test_next_event_derived_offset_rolls():

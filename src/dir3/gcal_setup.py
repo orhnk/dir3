@@ -3,7 +3,8 @@
     dir3-gcal-setup --client-id <CLIENT_ID> --client-secret <CLIENT_SECRET>
 
 Voraussetzung in der Google Cloud Console:
-  1. Projekt anlegen und die "Google Calendar API" aktivieren;
+  1. Projekt anlegen und die "Google Calendar API" **und** die
+     "Google Tasks API" aktivieren;
   2. OAuth-Berechtigungsdaten vom Typ "Desktopanwendung" erzeugen
      (client_id + client_secret).
 
@@ -26,8 +27,11 @@ import httpx
 
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
-#: Minimaler Umfang - dir3 legt nur Events an/aktualisiert sie, liest nie.
-SCOPE = "https://www.googleapis.com/auth/calendar.events"
+#: Calendar-Events plus Google Tasks (hybrid: Event mit Dauer + Aufgabe).
+SCOPE = (
+    "https://www.googleapis.com/auth/calendar.events "
+    "https://www.googleapis.com/auth/tasks"
+)
 #: Wie lange auf den Browser-Consent gewartet wird.
 TIMEOUT_SECONDS = 300
 
@@ -145,7 +149,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"        refresh_token={refresh!r},")
     print("        calendar_id=\"primary\",")
     print("    )")
-    print("\nDanach: dir3 <planfile> --sync-gcal")
+    print("\nDer Token umfasst Kalender-Events und Google Tasks.")
+    print("Danach: dir3 <planfile> --sync-gcal")
     return 0
 
 

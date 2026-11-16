@@ -18,6 +18,8 @@ def test_auth_url_contains_oauth_params():
     assert query["redirect_uri"] == ["http://127.0.0.1:8123/"]
     assert query["response_type"] == ["code"]
     assert query["scope"] == [SCOPE]
+    assert "auth/calendar.events" in query["scope"][0]
+    assert "auth/tasks" in query["scope"][0]
     assert query["access_type"] == ["offline"]
     assert query["prompt"] == ["consent"]
 

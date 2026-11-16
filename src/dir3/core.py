@@ -4,14 +4,17 @@ You program a day by returning a list of tasks from a function that receives the
 per-day context.  ``week`` and ``month`` assemble patterns which ``compile``
 expands into a concrete calendar.
 """
+
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass, field
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field, replace
 from datetime import time, timedelta
 from typing import TYPE_CHECKING, Any
 
+from .alarm import Alarm, coerce_alarm
 from .anchor import Anchor, midnight
+from .timeutils import subtract_time
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     pass
@@ -27,6 +30,21 @@ class PlanError(ValueError):
 #: A predicate used in ``unless``: (ctx) -> True means "skip today".
 Unless = Callable[[Any], bool]
 
+#: Where an attached Google Task sits relative to its event.
+TODO_POSITIONS = frozenset({"start", "end"})
+
+
+@dataclass(frozen=True, slots=True)
+class Todo:
+    """A Google Task attached to an event (no separate calendar event).
+
+    ``todo_position`` chooses whether the task is due at the event's start or
+    end.  Google Tasks stores only a date, so the time remains in the notes.
+    """
+
+    title: str
+    todo_position: str = "end"
+
 
 @dataclass(slots=True)
 class Task:
@@ -37,6 +55,20 @@ class Task:
     space: timedelta | None = None
     unless: tuple[Unless, ...] = ()
     flex: bool = True
+    overlap: bool = False
+    #: place names for a travel task (used by whereabouts)
+    origin: str | None = None
+    destination: str | None = None
+    #: Google Tasks list this task is mirrored into (None = event only)
+    task_list: str | None = None
+    #: where this task's own Google Task sits relative to the event
+    todo_position: str | None = None
+    #: extra Google Tasks attached to this event (no calendar events)
+    todos: tuple[Todo, ...] = ()
+    #: alarms the phone should ring for this event
+    alarms: tuple[Alarm, ...] = ()
+    #: explicitly silent - suppresses automatic wake-up alarms
+    alarm_opt_out: bool = False
 
     @property
     def anchored(self) -> bool:
@@ -51,6 +83,16 @@ class Task:
             bits.append(f"until={self.until!r}")
         if self.duration is not None:
             bits.append(f"{self.duration!s}")
+        if self.task_list is not None:
+            bits.append(f"task_list={self.task_list!r}")
+        if self.todo_position is not None:
+            bits.append(f"todo_position={self.todo_position!r}")
+        if self.todos:
+            bits.append(f"todos={self.todos!r}")
+        if self.alarms:
+            bits.append(f"alarms={self.alarms!r}")
+        if self.alarm_opt_out:
+            bits.append("alarm=False")
         return " ".join(bits)
 
 
@@ -63,6 +105,13 @@ def task(
     space: timedelta | str | None = None,
     unless: Unless | tuple[Unless, ...] | None = None,
     flex: bool = True,
+    overlap: bool = False,
+    origin: str | None = None,
+    destination: str | None = None,
+    task_list: str | None = None,
+    todo_position: str | None = None,
+    todos: Todo | str | Iterable[Todo | str] | None = None,
+    alarm: Alarm | str | bool | int | float | timedelta | Iterable | None = None,
 ) -> Task:
     """Declare one task inside a day.
 
@@ -71,19 +120,30 @@ def task(
     * ``duration`` - how long it lasts when no ``until`` is given;
     * ``space``  - a gap before the task (used when chaining);
     * ``unless`` - a predicate or tuple of predicates skipping the task for a day;
-    * ``flex``   - whether the compiler may shrink this task to absorb overflow.
+    * ``flex``   - whether the compiler may shrink this task to absorb overflow;
+    * ``overlap`` - allow this pinned task to overlap earlier pinned blocks;
+    * ``origin`` / ``destination`` - places for a travel task (whereabouts);
+    * ``task_list`` - mirror this task into a Google Tasks list (hybrid:
+      the timed calendar event stays as usual);
+    * ``todo_position`` - for the mirrored task: ``"start"`` or ``"end"``
+      of the event (Google Tasks keeps only the date, the time is in the
+      notes);
+    * ``todos`` - additional Google Tasks attached to this event.  They do
+      not create calendar events and land in the same ``task_list``.  Without
+      ``todo_position`` the event is only their container, so no task is
+      created for the event name itself.
+    * ``alarm`` - one or more :class:`~dir3.alarm.Alarm` specs; ``True`` /
+      ``"start"`` uses the default alarm, ``"end"`` rings at the end,
+      ``"-10m"`` ten minutes before the start, ``False`` silences the event
+      even when the wake-up policy would ring it.
     """
     if not name.strip():
         raise PlanError("task() needs a name")
 
     duration_td = (
-        duration
-        if isinstance(duration, timedelta) or duration is None
-        else _as_duration(duration)
+        duration if isinstance(duration, timedelta) or duration is None else _as_duration(duration)
     )
-    space_td = (
-        space if isinstance(space, timedelta) or space is None else _as_duration(space)
-    )
+    space_td = space if isinstance(space, timedelta) or space is None else _as_duration(space)
 
     predicates: tuple[Unless, ...] = ()
     if unless is not None:
@@ -91,6 +151,18 @@ def task(
 
     if until is None and duration_td is None and not flex:
         raise PlanError(f"task '{name}' needs an until anchor, a duration, or flex=True")
+
+    task_list_name = task_list.strip() if isinstance(task_list, str) else None
+    if task_list_name == "":
+        raise PlanError(f"task '{name}': task_list must not be empty")
+
+    alarms = coerce_alarm(alarm)
+    position = _normalize_todo_position(todo_position, name)
+    attached = _normalize_todos(todos, name)
+    if (position is not None or attached) and task_list_name is None:
+        raise PlanError(
+            f"task '{name}': todo_position/todos need a task_list"
+        )
 
     return Task(
         name=name.strip(),
@@ -100,13 +172,66 @@ def task(
         space=space_td,
         unless=predicates,
         flex=flex,
+        overlap=overlap,
+        origin=origin,
+        destination=destination,
+        task_list=task_list_name,
+        todo_position=position,
+        todos=attached,
+        alarms=alarms or (),
+        alarm_opt_out=alarms is None,
     )
+
+
+def going(event: Task, way: Task) -> list[Task]:
+    """Couple a travel task to an event: the way ends when the event starts."""
+    if event.start is None or not isinstance(event.start, time):
+        raise ValueError("going() braucht ein Event mit Uhrzeit")
+    if way.duration is None:
+        raise ValueError("going() braucht einen Weg mit Dauer")
+    return [replace(way, start=subtract_time(event.start, way.duration)), event]
 
 
 def _as_duration(value: str) -> timedelta:
     from .timeutils import parse_duration
 
     return parse_duration(value)
+
+
+def _normalize_todo_position(value: str | None, name: str) -> str | None:
+    if value is None:
+        return None
+    position = str(value).strip().lower()
+    if position not in TODO_POSITIONS:
+        raise PlanError(
+            f"task '{name}': todo_position must be 'start' or 'end', got {value!r}"
+        )
+    return position
+
+
+def _normalize_todos(
+    value: Todo | str | Iterable[Todo | str] | None, name: str
+) -> tuple[Todo, ...]:
+    if value is None:
+        return ()
+    items = (value,) if isinstance(value, (Todo, str)) else tuple(value)
+    todos: list[Todo] = []
+    for item in items:
+        if isinstance(item, str):
+            title = item.strip()
+            todo = Todo(title=title, todo_position="end")
+        elif isinstance(item, Todo):
+            title = item.title.strip()
+            todo = replace(item, title=title)
+        else:
+            raise PlanError(
+                f"task '{name}': todos must contain Todo or str, got {item!r}"
+            )
+        if not title:
+            raise PlanError(f"task '{name}': todo title must not be empty")
+        _normalize_todo_position(todo.todo_position, name)
+        todos.append(todo)
+    return tuple(todos)
 
 
 @dataclass(slots=True)

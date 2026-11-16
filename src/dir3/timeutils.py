@@ -3,6 +3,7 @@
 All time arithmetic wraps modulo 24h (forward in time), e.g. "01:00 + 2h" -> "03:00".
 A helper computing cross-midnight deltas is provided for prayer-bound spans.
 """
+
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
@@ -39,7 +40,7 @@ def parse_duration(value: str | int) -> timedelta:
         total = timedelta()
         rest = cleaned
         matched = False
-        for (unit, factor) in (("h", 60 * 60), ("m", 60)):
+        for unit, factor in (("h", 60 * 60), ("m", 60)):
             if unit in rest:
                 head, _, tail = rest.partition(unit)
                 if head:
@@ -65,6 +66,23 @@ def parse_duration(value: str | int) -> timedelta:
 
 def format_time(value: time) -> str:
     return value.strftime("%H:%M")
+
+
+def to_minutes(value: str | time) -> int:
+    """Convert ``"05:30"`` or a ``time`` to minutes since midnight."""
+    moment = value if isinstance(value, time) else parse_hhmm(value)
+    return moment.hour * 60 + moment.minute
+
+
+def time_from_minutes(minutes: int) -> time:
+    """Convert minutes since midnight to a ``time``, wrapping modulo 24h."""
+    minutes %= 24 * 60
+    return time(minutes // 60, minutes % 60)
+
+
+def format_minutes(minutes: int) -> str:
+    """Format minutes since midnight as ``HH:MM``."""
+    return format_time(time_from_minutes(minutes))
 
 
 def format_duration(value: timedelta) -> str:

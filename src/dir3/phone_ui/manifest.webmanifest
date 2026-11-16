@@ -1,0 +1,19 @@
+{
+  "name": "dir3",
+  "short_name": "dir3",
+  "description": "Plan, code and alarms for dir3",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1317",
+  "theme_color": "#101418",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

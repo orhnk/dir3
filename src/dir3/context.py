@@ -13,10 +13,11 @@ Example::
             task("Job", until=work_end - timedelta(hours=1)),
         ]
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, time
+from datetime import date, datetime, time
 from typing import TYPE_CHECKING
 
 from .anchor import Anchor, FixedAnchor, FunctionAnchor, NamedAnchor, midnight
@@ -81,6 +82,133 @@ class SunGate:
         return NamedAnchor("sun.sunset", lambda ctx: self._times(ctx).sunset)
 
 
+class TransitGate:
+    """Transit lookups scoped to the plan day (uses ``services.transit``)."""
+
+    def __init__(self, ctx: DayContext) -> None:
+        self._ctx = ctx
+
+    @property
+    def _service(self):
+        return self._ctx.services.transit
+
+    def _when(self, at, arrival):
+        if at is not None and arrival is not None:
+            raise ValueError("at and arrival are mutually exclusive")
+
+        def local(value):
+            if isinstance(value, datetime):
+                return value
+            if isinstance(value, time):
+                return datetime.combine(self._ctx.plan_date, value)
+            raise TypeError("transit time must be a datetime or time")
+
+        return (
+            local(at) if at is not None else None,
+            local(arrival) if arrival is not None else None,
+        )
+
+    def journeys(
+        self,
+        origin,
+        destination,
+        *,
+        at=None,
+        arrival=None,
+        lines=None,
+        results=None,
+        fewest_transfers=False,
+    ):
+        departure, due = self._when(at, arrival)
+        kwargs = {}
+        if lines is not None:
+            kwargs["lines"] = lines
+        if results is not None:
+            kwargs["results"] = results
+        if fewest_transfers:
+            kwargs["fewest_transfers"] = True
+        return self._service.journeys(
+            origin,
+            destination,
+            departure=departure,
+            arrival=due,
+            **kwargs,
+        )
+
+    def journey(
+        self,
+        origin,
+        destination,
+        *,
+        at=None,
+        arrival=None,
+        lines=None,
+        results=None,
+        fewest_transfers=False,
+    ):
+        departure, due = self._when(at, arrival)
+        kwargs = {}
+        if lines is not None:
+            kwargs["lines"] = lines
+        if results is not None:
+            kwargs["results"] = results
+        if fewest_transfers:
+            kwargs["fewest_transfers"] = True
+        return self._service.journey(
+            origin,
+            destination,
+            departure=departure,
+            arrival=due,
+            **kwargs,
+        )
+
+    def duration(
+        self,
+        origin,
+        destination,
+        *,
+        at=None,
+        arrival=None,
+        lines=None,
+        results=None,
+        fewest_transfers=False,
+    ):
+        departure, due = self._when(at, arrival)
+        kwargs = {}
+        if lines is not None:
+            kwargs["lines"] = lines
+        if results is not None:
+            kwargs["results"] = results
+        if fewest_transfers:
+            kwargs["fewest_transfers"] = True
+        return self._service.duration(
+            origin,
+            destination,
+            departure=departure,
+            arrival=due,
+            **kwargs,
+        )
+
+    def from_here(
+        self,
+        destination,
+        *,
+        at=None,
+        arrival=None,
+        lines=None,
+        fewest_transfers=False,
+    ):
+        """Travel time from the plan location to ``destination``."""
+        return self.duration(
+            self._ctx.location,
+            destination,
+            at=at,
+            arrival=arrival,
+            lines=lines,
+            fewest_transfers=fewest_transfers,
+        )
+
+
 @dataclass(slots=True, init=False)
 class DayContext:
     plan_date: date
@@ -110,6 +238,11 @@ class DayContext:
     @property
     def weather(self):
         return self.services.weather
+
+    #: convenient access to transit journeys and travel times
+    @property
+    def transit(self) -> TransitGate:
+        return TransitGate(self)
 
     #: the resolved location for the plan day
     @property

@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
+from .alarm import apply_wake_alarms
 from .anchor import DerivedAnchor, NextEventAnchor, next_event
 from .config import Dir3Config
 from .context import DayContext
@@ -24,6 +25,7 @@ from .core import (
     Month,
     PlanError,
     Task,
+    Todo,
     Week,
 )
 from .services import Services
@@ -48,6 +50,19 @@ class PlannedEvent:
     #: the event intentionally runs into the next calendar day
     #: (``until=next_event``, e.g. sleep until tomorrow's first event)
     carry: bool = False
+    #: places for a travel event (used by whereabouts)
+    origin: str | None = None
+    destination: str | None = None
+    #: Google Tasks list this event is mirrored into (None = event only)
+    task_list: str | None = None
+    #: where this event's own Google Task sits relative to the event
+    todo_position: str | None = None
+    #: additional Google Tasks attached to this event (no calendar events)
+    todos: tuple[Todo, ...] = ()
+    #: alarms the phone rings for this event
+    alarms: tuple = ()
+    #: explicit "no automatic alarm" marker
+    alarm_opt_out: bool = False
 
     @property
     def active(self) -> bool:
@@ -123,10 +138,13 @@ def compile_pattern(
     day_overrides = dict(overrides or {})
 
     plan = Plan(title=title or "dir3 Plan", start=start)
-    plan.days = [None] * total_days
+    # Compile one day beyond the horizon: the last planned day then still
+    # knows the first event of its successor, so ``until=next_event`` does not
+    # fall back to midnight on that day.  The extra day is dropped afterwards.
+    plan.days = [None] * (total_days + 1)
     # Compile from the last day backwards: each day learns its successor, so
     # ``until=next_event`` can reach across midnight into the next active day.
-    for index in range(total_days - 1, -1, -1):
+    for index in range(total_days, -1, -1):
         calendar = start + timedelta(days=index)
         day_def = _day_for(calendar, index, unit, day_overrides)
         if day_def is None:
@@ -137,6 +155,7 @@ def compile_pattern(
         day_model = _invoke_day(day_def, ctx)
         plan.days[index] = _compile_day(day_model, ctx)
         ctx._resolve_cache.clear()
+    plan.days = plan.days[:total_days]
     return plan
 
 
@@ -263,7 +282,16 @@ def _compile_day(day: Day, ctx: DayContext) -> PlanDay:
     for item in day.tasks:
         if item.unless and any(pred(ctx) for pred in item.unless):
             events.append(
-                PlannedEvent(name=item.name, start=None, end=None, skipped=True)
+                PlannedEvent(
+                    name=item.name,
+                    start=None,
+                    end=None,
+                    skipped=True,
+                    task_list=item.task_list,
+                    todo_position=item.todo_position,
+                    todos=item.todos,
+                    alarm_opt_out=item.alarm_opt_out,
+                )
             )
             continue
 
@@ -287,7 +315,7 @@ def _compile_day(day: Day, ctx: DayContext) -> PlanDay:
             deep_night = start_dt.time() < _DAWN_LIMIT and gap >= timedelta(hours=12)
             if spans_a_full_block or deep_night:
                 start_dt += _DAY
-            else:
+            elif not item.overlap:
                 raise PlanError(
                     f"'{day.name}': '{item.name}' at {format_time(start_dt.time())} "
                     f"overlaps a pinned block that ends at {format_time(anchored_end.time())}"
@@ -308,12 +336,24 @@ def _compile_day(day: Day, ctx: DayContext) -> PlanDay:
             flexible=item.flex,
             anchored=anchored,
             carry=carry,
+            origin=item.origin,
+            destination=item.destination,
+            task_list=item.task_list,
+            todo_position=item.todo_position,
+            todos=item.todos,
+            alarms=item.alarms,
+            alarm_opt_out=item.alarm_opt_out,
         )
         events.append(event)
         if end_dt is not None:
             cursor = end_dt
 
-    return _balance(PlanDay(date=ctx.plan_date, name=day.name, events=events), cursor, end_of_day)
+    pday = _balance(PlanDay(date=ctx.plan_date, name=day.name, events=events), cursor, end_of_day)
+    settings = getattr(getattr(ctx, "services", None), "config", None)
+    alarm_settings = getattr(settings, "alarms", None)
+    if alarm_settings is not None and alarm_settings.enabled:
+        apply_wake_alarms(pday.events, alarm_settings.resolved_policy())
+    return pday
 
 
 def _resolve_start(

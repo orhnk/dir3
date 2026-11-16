@@ -20,8 +20,10 @@ def test_planfile_tuple_location_override():
 
 def test_planfile_prayer_override_string():
     config = Dir3Config.from_planfile(_M(prayer="ezanvakti"))
-    assert config.prayer.provider == "ezanvakti"
-    assert config.prayer.method == "MWL"
+    # EzanVakti provider was removed; maps to explicit Turkey/Diyanet method.
+    assert config.prayer.provider == "auto"
+    assert config.prayer.method == 13
+    assert config.prayer.method_auto is False
 
 
 def test_planfile_provider_shortcut():
@@ -31,8 +33,21 @@ def test_planfile_provider_shortcut():
 
 def test_planfile_prayer_dict():
     config = Dir3Config.from_planfile(_M(prayer={"provider": "aladhan", "madhab": "Hanafi"}))
-    assert config.prayer.provider == "aladhan"
-    assert config.prayer.madhab == "Hanafi"
+    assert config.prayer.provider == "auto"
+    assert config.prayer.school == 1
+
+
+def test_planfile_prayer_legacy_method_name():
+    config = Dir3Config.from_planfile(_M(prayer={"method": "MWL"}))
+    assert config.prayer.method == 3
+    assert config.prayer.method_auto is False
+
+
+def test_planfile_prayer_explicit_caelestia():
+    config = Dir3Config.from_planfile(_M(prayer={"method": 13, "school": 1}))
+    assert config.prayer.method == 13
+    assert config.prayer.school == 1
+    assert config.prayer.method_auto is False
 
 
 def test_planfile_settings_instances():

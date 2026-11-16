@@ -121,4 +121,8 @@ def test_unless_is_holiday_drops_work_core(tmp_path):
 
 def test_weekend_prefers_weekend_template(tmp_path):
     day_dec_26 = _days_by_date(_plan(tmp_path))[date(2026, 12, 26)]
-    assert day_dec_26.name == "Public Holiday - Zweiter Weihnachtstag"
+    # The name comes from the installed ``holidays`` language data, which can
+    # differ between environments; the plan must mirror the library verbatim.
+    expected = ph.holiday_name(date(2026, 12, 26))
+    assert expected
+    assert day_dec_26.name == f"Public Holiday - {expected}"

@@ -4,7 +4,7 @@ Der Standort bestimmt sich automatisch per Geolocation (oder via
 ``location = (lat, lon, "zone")`` im Planfile), Gebete kommen aus Aladhan
 mit Offline-Fallback - keine Konfig-Datei nötig:
 
-    dir3 examples/dir3.py --until 360
+    dir3 examples/simple.py --until 360
 """
 from weeks import pray_based_week, routine_week
 
@@ -17,8 +17,8 @@ location = (40.7992, 29.4305, "Europe/Istanbul")
 # --- Google Calendar (optional): geplante Events synchronisieren -------------
 # Credentials kommen hierher ins Planfile. Ausführen mit --sync-gcal:
 #
-#   dir3 examples/dir3.py --until 360 --sync-gcal
-#   dir3 examples/dir3.py --until 360 --sync-gcal --gcal-dry-run   # nur anzeigen
+#   dir3 examples/simple.py --until 360 --sync-gcal
+#   dir3 examples/simple.py --until 360 --sync-gcal --gcal-dry-run   # nur anzeigen
 #
 # from dir3 import GoogleCalendar
 # gcal = GoogleCalendar(

@@ -176,9 +176,15 @@ def test_cache_survives_corrupted_json(tmp_path):
 
 def test_prayer_cache_key_has_no_path_separators():
     key = PrayerService._key(
-        "aladhan", D0, GeoLocation(40.7992, 29.4305, "Europe/Istanbul")
+        D0, GeoLocation(40.7992, 29.4305, "Europe/Istanbul"), 13, 0
     )
     assert "/" not in key and "\\" not in key
+    # Caelestia month key tags method/school so settings changes can't leak.
+    assert "|m13s0|" in key
+    legacy = PrayerService._key(
+        "aladhan", D0, GeoLocation(40.7992, 29.4305, "Europe/Istanbul")
+    )
+    assert "/" not in legacy and "\\" not in legacy
 
 
 # ---------------------------------------------------------------------------
